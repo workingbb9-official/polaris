@@ -1,5 +1,6 @@
-use std::net::{TcpListener, TcpStream};
+use log::info;
 use std::io::{self, Read, Write};
+use std::net::{TcpListener, TcpStream};
 
 pub enum ServerState {
     Listening,
@@ -17,6 +18,7 @@ impl NetworkServer {
         let listener = TcpListener::bind(addr)?;
         listener.set_nonblocking(true)?;
 
+        info!("Opening server on {}", addr);
         Ok(Self {
             listener,
             state: ServerState::Listening,
@@ -25,11 +27,9 @@ impl NetworkServer {
     }
 
     pub fn run(&mut self) {
-        loop {
-            match self.state {
-                ServerState::Listening => self.handle_listening(),
-                ServerState::Processing => self.handle_processing(),
-            }
+        match self.state {
+            ServerState::Listening => self.handle_listening(),
+            ServerState::Processing => self.handle_processing(),
         }
     }
 
@@ -38,9 +38,11 @@ impl NetworkServer {
             return;
         };
 
-        println!("Connected to {}", addr);
+        info!("Connected to {}", addr);
 
-        stream.set_nonblocking(true).expect("Failed to set non-blocking");
+        stream
+            .set_nonblocking(true)
+            .expect("Failed to set non-blocking");
         self.client = Some(stream);
         self.state = ServerState::Processing;
     }
@@ -51,15 +53,16 @@ impl NetworkServer {
             return;
         };
 
-        let mut buffer = [0u8; 1024];
+        let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
 
+        let mut buffer = [0u8; 1024];
         match stream.read(&mut buffer) {
             Ok(0) => {
-                println!("Client closed connection");
+                info!("Client closed connection");
                 self.disconnect();
             }
             Ok(n) => {
-                println!("Read {} bytes {:?}", n, &buffer[..n]);
+                info!("Read {} bytes {:?}", n, &buffer[..n]);
                 let response = "HTTP/1.1 200 OK\r\n\
                                 Content-Type: text/plain\r\n\
                                 Content-Length: 12\r\n\r\n\
@@ -70,13 +73,15 @@ impl NetworkServer {
                 // Keep searching for data
             }
             Err(_) => {
-                println!("Communication error");
+                info!("Communication error");
                 self.disconnect();
             }
         }
     }
 
     fn disconnect(&mut self) {
+        let addr = self.listener.local_addr().unwrap();
+        info!("Disconnecting from {}", addr);
         self.client = None;
         self.state = ServerState::Listening;
     }

@@ -3,8 +3,12 @@ use server::NetworkServer;
 use std::io;
 
 fn main() -> io::Result<()> {
-    let mut server = NetworkServer::new("127.0.0.1:8080")?;
-    server.run();
+    env_logger::init();
+    let mut s1 = NetworkServer::new("127.0.0.1:8080")?;
+    let mut s2 = NetworkServer::new("127.0.0.1:9000")?;
 
-    Ok(())
+    loop {
+        s1.run();
+        s2.run();
+    }
 }

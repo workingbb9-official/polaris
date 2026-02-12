@@ -1,6 +1,4 @@
-mod server;
-mod handler;
-use server::NetworkServer;
+use polaris::NetworkServer;
 
 #[tokio::main]
 async fn main() {

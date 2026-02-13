@@ -1,6 +1,6 @@
-use log::{info};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use log::info;
 use tokio::io::Result;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 pub async fn handle_client(mut stream: TcpStream) -> Result<()> {
@@ -13,7 +13,7 @@ pub async fn handle_client(mut stream: TcpStream) -> Result<()> {
         }
         n => n,
     };
-    
+
     let has_get = n >= 3 && buf[..n].starts_with(b"GET");
     let has_http = n >= 4 && buf[..n].starts_with(b"HTTP");
 

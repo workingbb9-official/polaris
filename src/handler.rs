@@ -1,42 +1,26 @@
-use log::{info, warn};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+pub async fn handle_client(msg: &str) -> String {
+    let has_get = msg.starts_with("GET");
+    let has_http = msg.starts_with("HTTP");
 
-pub async fn handle_client(mut stream: TcpStream) {
-    let mut buf = [0u8; 1024];
-
-    let n = match stream.read(&mut buf).await {
-        Err(e) => {
-            warn!("Received error {}", e);
-            return;
-        }
-        Ok(0) => {
-            info!("Client disconnected");
-            return;
-        }
-        Ok(n) => n,
-    };
-
-    if n >= 3 && buf[..n].starts_with(b"GET") {
-        handle_http(stream).await;
-    } else if n >= 4 && buf[..n].starts_with(b"HTTP") {
-        handle_http(stream).await;
+    if has_get || has_http {
+        return handle_http().await;
     }
+
+    "Unknown".to_string()
 }
 
-async fn handle_http(mut stream: TcpStream) {
-    let content = "Hello from Rust";
+async fn handle_http() -> String {
+    let content = "Hello from Polaris";
     let response = format!(
         "HTTP/1.1 200 OK\r\n\
-         Content-Length: {}\r\n\
-         Content-Type: text/plain\r\n\
-         Connection: close\r\n\
-         \r\n\
-         {}",
-        content.len(),
-        content
+        Content-Length: {len}\r\n\
+        Content-Type: text/plain\r\n\
+        Connection: close\r\n\
+        \r\n\
+        {content}",
+        len = content.len(),
+        content = content
     );
 
-    let _ = stream.write_all(response.as_bytes()).await;
-    let _ = stream.flush().await;
+    response
 }

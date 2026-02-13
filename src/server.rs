@@ -1,5 +1,6 @@
 use crate::handler;
 use crate::network;
+use crate::parser;
 use log::{info, warn};
 
 use std::net::SocketAddr;
@@ -20,27 +21,30 @@ impl NetworkServer {
         loop {
             let (stream, _) = self.listener.accept().await?;
             info!("Connected to client");
-            Self::handle_connection(stream).await;
+            tokio::spawn(async move {
+                Self::handle_connection(stream).await;
+            });
         }
     }
 
     async fn handle_connection(mut stream: TcpStream) {
-        tokio::spawn(async move {
-            let msg = match network::get_msg(&mut stream).await {
-                Ok(Some(msg)) => msg,
-                Ok(None) => {
-                    info!("Client disconnected");
-                    return;
-                }
-                Err(e) => {
-                    warn!("Failed to get msg with error: {}", e);
-                    return;
-                }
-            };
-            let response = handler::handle_client(&msg).await;
-            if let Err(e) = network::send_msg(&response, &mut stream).await {
-                warn!("Failed to send msg with error: {}", e);
+        let msg = match network::get_msg(&mut stream).await {
+            Ok(Some(msg)) => msg,
+            Ok(None) => {
+                info!("Client disconnected");
+                return;
             }
-        });
+            Err(e) => {
+                warn!("Failed to get msg with error: {}", e);
+                return;
+            }
+        };
+
+        let parsed_msg = parser::parse_msg(&msg);
+        let response = handler::handle_client(&parsed_msg);
+
+        if let Err(e) = network::send_msg(&response, &mut stream).await {
+            warn!("Failed to send msg with error: {}", e);
+        }
     }
 }

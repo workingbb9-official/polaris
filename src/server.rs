@@ -41,7 +41,7 @@ impl NetworkServer {
         };
 
         let parsed_msg = parser::parse_msg(&msg);
-        let response = handler::handle_client(parsed_msg);
+        let response = handler::handle_client(&parsed_msg);
 
         if let Err(e) = network::send_msg(&response, &mut stream).await {
             warn!("Failed to send msg with error: {}", e);

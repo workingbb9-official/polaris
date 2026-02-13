@@ -27,7 +27,6 @@ pub fn parse_msg(msg: &str) -> Message {
         }
         _ => Protocol::Unknown,
     };
-    
 
     Message {
         protocol,
@@ -37,7 +36,7 @@ pub fn parse_msg(msg: &str) -> Message {
 
 fn parse_http(first_line: &str) -> &str {
     let mut parts = first_line.split_whitespace();
-    
+
     let _method = parts.next();
     let path = parts.next();
     let _proto = parts.next();

@@ -1,7 +1,8 @@
 use crate::handler;
-use log::info;
+use crate::network;
+use log::{info, warn};
+
 use std::net::SocketAddr;
-use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 
 pub struct NetworkServer {
@@ -19,25 +20,27 @@ impl NetworkServer {
         loop {
             let (stream, _) = self.listener.accept().await?;
             info!("Connected to client");
-
-            tokio::spawn(async move {
-                let _ = handler::handle_client(stream).await;
-            });
+            Self::handle_connection(stream).await;
         }
     }
 
-    async fn get_msg(stream: &mut TcpStream) -> tokio::io::Result<Option<String>> {
-        let mut buf = [0u8; 1024];
-
-        let n = match stream.read(&mut buf).await? {
-            0 => {
-                info!("Client disconnected");
-                return Ok(None);
+    async fn handle_connection(mut stream: TcpStream) {
+        tokio::spawn(async move {
+            let msg = match network::get_msg(&mut stream).await {
+                Ok(Some(msg)) => msg,
+                Ok(None) => {
+                    info!("Client disconnected");
+                    return;
+                }
+                Err(e) => {
+                    warn!("Failed to get msg with error: {}", e);
+                    return;
+                }
+            };
+            let response = handler::handle_client(&msg).await;
+            if let Err(e) = network::send_msg(&response, &mut stream).await {
+                warn!("Failed to send msg with error: {}", e);
             }
-            n => n,
-        };
-
-        let msg = String::from_utf8_lossy(&buf[..n]).to_string();
-        Ok(Some(msg))
+        });
     }
 }

@@ -1,5 +1,5 @@
 use crate::network;
-use crate::parser::Protocol;
+use crate::protocol::Protocol;
 
 use log::{info, warn};
 use std::collections::HashMap;
@@ -10,6 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 
 type Handler = fn(&[u8]) -> Vec<u8>;
 
+#[derive(Default)]
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
 }
@@ -33,16 +34,17 @@ impl Router {
     }
 }
 
-pub struct NetworkServer<P: Protocol> {
+pub struct Server<P: Protocol> {
     listener: TcpListener,
     protocol: P,
     router: Router,
 }
 
-impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> NetworkServer<P> {
+impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     pub async fn new(addr: &str, protocol: P, router: Router) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
+
         Ok(Self {
             listener,
             protocol,

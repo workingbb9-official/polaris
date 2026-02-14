@@ -31,10 +31,7 @@ impl Protocol for HttpProtocol {
 
     fn format(&self, response: &[u8]) -> Vec<u8> {
         let len = response.len();
-        let res_to_str = match std::str::from_utf8(response) {
-            Ok(s) => s,
-            Err(_) => "404 response not found",
-        };
+        let res_to_str = std::str::from_utf8(response).unwrap_or("404 Response Not Found");
 
         format!(
             "HTTP/1.1 200 OK\r\n\

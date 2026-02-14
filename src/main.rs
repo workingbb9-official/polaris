@@ -1,5 +1,5 @@
 use log::warn;
-use polaris::{HttpProtocol, NetworkServer, Router};
+use polaris::{HttpProtocol, Router, Server};
 use std::sync::Arc;
 
 static HTML_ABOUT: &str = r#"<!DOCTYPE html>
@@ -44,7 +44,7 @@ async fn main() {
     router.add_route(b"/about", handle_about);
     router.add_route(b"/error", handle_error);
 
-    let server = NetworkServer::new(port, protocol, router)
+    let server = Server::new(port, protocol, router)
         .await
         .expect("Failed to create server");
 

@@ -14,8 +14,8 @@ pub async fn get_msg(stream: &mut TcpStream) -> Result<Option<String>> {
     Ok(Some(msg))
 }
 
-pub async fn send_msg(msg: &str, stream: &mut TcpStream) -> Result<()> {
-    stream.write_all(msg.as_bytes()).await?;
+pub async fn send_msg(msg: &[u8], stream: &mut TcpStream) -> Result<()> {
+    stream.write_all(msg).await?;
     stream.flush().await?;
     Ok(())
 }

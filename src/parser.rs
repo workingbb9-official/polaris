@@ -1,45 +1,49 @@
-pub enum Protocol {
-    Http,
-    Unknown,
+pub trait Protocol {
+    fn parse(&self, raw: &[u8]) -> Vec<u8>;
+    fn format(&self, response: &[u8]) -> Vec<u8>;
 }
 
-pub struct Message {
-    pub protocol: Protocol,
-    pub content: String,
-}
+pub struct HttpProtocol;
 
-pub fn parse_msg(msg: &str) -> Message {
-    let first_line = msg.lines().next().unwrap_or("");
-    let mut content: &str = "";
+impl Protocol for HttpProtocol {
+    fn parse(&self, raw: &[u8]) -> Vec<u8> {
+        let request = match std::str::from_utf8(raw) {
+            Ok(s) => s,
+            Err(_) => return b"/error".to_vec(),
+        };
 
-    let protocol = match first_line {
-        s if s.starts_with("GET ") => {
-            content = parse_http(first_line);
-            Protocol::Http
-        }
-        s if s.starts_with("POST ") => {
-            content = parse_http(first_line);
-            Protocol::Http
-        }
-        s if s.starts_with("HTTP") => {
-            content = parse_http(first_line);
-            Protocol::Http
-        }
-        _ => Protocol::Unknown,
-    };
+        let first_line = match request.lines().next() {
+            Some(line) => line,
+            None => return b"/error".to_vec(),
+        };
 
-    Message {
-        protocol,
-        content: content.to_string(),
+        let mut parts = first_line.split_whitespace();
+
+        let _method = parts.next();
+
+        let path = match parts.next() {
+            Some(p) => p,
+            None => return b"/error".to_vec(),
+        };
+
+        path.as_bytes().to_vec()
     }
-}
 
-fn parse_http(first_line: &str) -> &str {
-    let mut parts = first_line.split_whitespace();
+    fn format(&self, response: &[u8]) -> Vec<u8> {
+        let len = response.len();
+        let res_to_str = match std::str::from_utf8(response) {
+            Ok(s) => s,
+            Err(_) => "404 response not found",
+        };
 
-    let _method = parts.next();
-    let path = parts.next();
-    let _proto = parts.next();
-
-    path.unwrap_or("")
+        format!(
+            "HTTP/1.1 200 OK\r\n\
+            Content-Length: {len}\r\n\
+            Content-Type: text/html\r\n\
+            Connection: close\r\n\
+            \r\n\
+            {res_to_str}"
+        )
+        .into_bytes()
+    }
 }

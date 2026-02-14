@@ -77,7 +77,7 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             }
         };
 
-        let p_msg = self.protocol.parse(msg.as_bytes());
+        let p_msg = self.protocol.parse(&msg);
         let resp = self.router.handle(&p_msg);
         let f_resp = self.protocol.format(&resp);
 

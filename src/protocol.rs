@@ -35,11 +35,12 @@ impl Protocol for HttpProtocol {
 
         format!(
             "HTTP/1.1 200 OK\r\n\
-            Content-Length: {len}\r\n\
-            Content-Type: text/html\r\n\
-            Connection: keep-alive\r\n\
-            \r\n\
-            {res_to_str}"
+Content-Security-Policy: default-src 'self'; script-src 'self';
+Content-Length: {len}\r\n\
+Content-Type: text/html\r\n\
+Connection: keep-alive\r\n\
+\r\n\
+{res_to_str}"
         )
         .into_bytes()
     }

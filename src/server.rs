@@ -65,24 +65,26 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     }
 
     async fn handle_connection(&self, mut stream: TcpStream) {
-        let msg = match network::get_msg(&mut stream).await {
-            Ok(Some(msg)) => msg,
-            Ok(None) => {
-                info!("Client disconnected");
-                return;
-            }
-            Err(e) => {
-                warn!("Failed to get msg with error: {}", e);
-                return;
-            }
-        };
+        loop {
+            let msg = match network::get_msg(&mut stream).await {
+                Ok(Some(msg)) => msg,
+                Ok(None) => {
+                    info!("Dropping socket");
+                    break;
+                }
+                Err(e) => {
+                    warn!("Failed to get msg with error: {}", e);
+                    continue;
+                }
+            };
 
-        let p_msg = self.protocol.parse(msg.as_bytes());
-        let resp = self.router.handle(&p_msg);
-        let f_resp = self.protocol.format(&resp);
+            let p_msg = self.protocol.parse(&msg);
+            let resp = self.router.handle(&p_msg);
+            let f_resp = self.protocol.format(&resp);
 
-        if let Err(e) = network::send_msg(&f_resp, &mut stream).await {
-            warn!("Failed to send msg with error: {}", e);
+            if let Err(e) = network::send_msg(&f_resp, &mut stream).await {
+                warn!("Failed to send msg with error: {}", e);
+            }
         }
     }
 }

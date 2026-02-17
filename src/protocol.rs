@@ -37,7 +37,7 @@ impl Protocol for HttpProtocol {
             "HTTP/1.1 200 OK\r\n\
             Content-Length: {len}\r\n\
             Content-Type: text/html\r\n\
-            Connection: close\r\n\
+            Connection: keep-alive\r\n\
             \r\n\
             {res_to_str}"
         )

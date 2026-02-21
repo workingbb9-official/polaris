@@ -78,7 +78,20 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
                 }
             };
 
-            let p_msg = self.protocol.parse(&msg);
+            let p_msg = match self.protocol.parse(&msg) {
+                Some(p) => p,
+                None => {
+                    warn!("Failed to parse msg");
+                    let bad_req = b"HTTP/1.1 400 Bad Request\r\n\
+                                   Connection: close\r\n\r\n";
+
+                    if let Err(e) = network::send_msg(bad_req, &mut stream).await {
+                        warn!("Failed to send msg with error: {}", e);
+                    }
+                    break;
+                }
+            };
+
             let resp = self.router.handle(&p_msg);
             let f_resp = self.protocol.format(&resp);
 

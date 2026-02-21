@@ -28,6 +28,7 @@ static HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
         <head><title>Polaris</title></head>
         <body>
             <h1>404 Not Found</h1>
+            <h2>That URL doesn't exist</h2>
         </body>
     </html>
     "#;
@@ -42,7 +43,7 @@ async fn main() {
     let mut router = Router::new();
     router.add_route(b"/", handle_home);
     router.add_route(b"/about", handle_about);
-    router.add_route(b"/error", handle_error);
+    router.add_err_handler(handle_error);
 
     let server = Server::new(port, protocol, router)
         .await

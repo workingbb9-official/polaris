@@ -10,15 +10,29 @@ use tokio::net::{TcpListener, TcpStream};
 
 type Handler = fn(&[u8]) -> Vec<u8>;
 
-#[derive(Default)]
+static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
+    <html>
+        <head><title>Polaris</title></head>
+        <body>
+            <h1>404 Not Found</h1>
+        </body>
+    </html>
+    "#;
+
+fn default_err_handler(_: &[u8]) -> Vec<u8> {
+    DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec()
+}
+
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
+    err_handler: Handler,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
             routes: HashMap::new(),
+            err_handler: default_err_handler,
         }
     }
 
@@ -26,11 +40,21 @@ impl Router {
         self.routes.insert(path.into(), handler);
     }
 
+    pub fn add_err_handler(&mut self, handler: Handler) {
+        self.err_handler = handler;
+    }
+
     pub fn handle(&self, path: &[u8]) -> Vec<u8> {
         match self.routes.get(path) {
             Some(handler) => handler(path),
-            None => "No URL".into(),
+            None => (self.err_handler)(path),
         }
+    }
+}
+
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

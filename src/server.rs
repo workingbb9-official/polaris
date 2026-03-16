@@ -19,6 +19,9 @@ static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     </html>
     "#;
 
+const BUF_SIZE: usize = 8192;
+const TIMEOUT_LEN: u64 = 5;
+
 fn default_err_handler(_: &[u8]) -> Vec<u8> {
     DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec()
 }
@@ -89,20 +92,26 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     }
 
     async fn handle_connection(&self, mut stream: TcpStream) {
+        let mut buf = network::SlidingBuffer::new(BUF_SIZE);
+
         loop {
-            let msg = match network::get_msg(&mut stream).await {
-                Ok(Some(msg)) => msg,
-                Ok(None) => {
-                    info!("Dropping socket");
-                    break;
-                }
-                Err(e) => {
-                    warn!("Failed to get msg with error: {}", e);
+            let pos = match network::get_msg(&mut stream, &mut buf, TIMEOUT_LEN).await {
+                Err(network::RecvError::HeaderTooLarge) => {
+                    info!("Header too large");
                     continue;
                 }
+                Err(network::RecvError::IoError) => {
+                    info!("Sys error with receiving");
+                    continue;
+                }
+                Ok(0) => {
+                    info!("No data, dropping socket");
+                    break;
+                }
+                Ok(n) => n,
             };
 
-            let p_msg = match self.protocol.parse(&msg) {
+            let p_msg = match self.protocol.parse(&buf.data()[..pos]) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
@@ -122,6 +131,8 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             if let Err(e) = network::send_msg(&f_resp, &mut stream).await {
                 warn!("Failed to send msg with error: {}", e);
             }
+
+            buf.shift_leftovers(pos);
         }
     }
 }

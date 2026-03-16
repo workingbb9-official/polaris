@@ -1,7 +1,7 @@
 use log::warn;
-use polaris::{HttpProtocol, Router, Server};
-use std::sync::Arc;
+use polaris::{HttpProtocol, HttpResponse, Router, Server};
 use std::fs;
+use std::sync::Arc;
 
 static HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     <html>
@@ -38,26 +38,26 @@ async fn main() {
     }
 }
 
-fn home_html(_: &[u8]) -> Vec<u8> {
-    let bytes = fs::read("static/index.html");
-    bytes.expect("No way ts didn't work")
+fn home_html(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/index.html").unwrap();
+    HttpResponse::new(bytes, "text/html".to_string())
 }
 
-fn home_css(_: &[u8]) -> Vec<u8> {
-    let bytes = fs::read("static/style.css");
-    bytes.expect("No way ts didn't work")
+fn home_css(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/style.css").unwrap();
+    HttpResponse::new(bytes, "text/css".to_string())
 }
 
-fn home_js(_: &[u8]) -> Vec<u8> {
-    let bytes = fs::read("static/script.js");
-    bytes.expect("No way ts didn't work")
+fn home_js(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/script.js").unwrap();
+    HttpResponse::new(bytes, "application/javascript".to_string())
 }
 
-fn about_html(_: &[u8]) -> Vec<u8> {
-    let bytes = fs::read("static/about.html");
-    bytes.expect("No way ts didn't work")
+fn about_html(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/about.html").unwrap();
+    HttpResponse::new(bytes, "text/html".to_string())
 }
 
-fn handle_error(_: &[u8]) -> Vec<u8> {
-    HTML_NOT_FOUND.as_bytes().to_vec()
+fn handle_error(_: &[u8]) -> HttpResponse {
+    HttpResponse::new(HTML_NOT_FOUND.as_bytes().to_vec(), "text/html".to_string())
 }

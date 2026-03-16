@@ -1,5 +1,5 @@
 use crate::network;
-use crate::protocol::Protocol;
+use crate::protocol::{HttpResponse, Protocol};
 
 use log::{info, warn};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 
-type Handler = fn(&[u8]) -> Vec<u8>;
+type Handler = fn(&[u8]) -> HttpResponse;
 
 static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     <html>
@@ -22,8 +22,10 @@ static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
 const BUF_SIZE: usize = 8192;
 const TIMEOUT_LEN: u64 = 5;
 
-fn default_err_handler(_: &[u8]) -> Vec<u8> {
-    DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec()
+fn default_err_handler(_: &[u8]) -> HttpResponse {
+    let body = DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec();
+
+    HttpResponse::new(body, "text/html".to_string())
 }
 
 pub struct Router {
@@ -47,7 +49,7 @@ impl Router {
         self.err_handler = handler;
     }
 
-    pub fn handle(&self, path: &[u8]) -> Vec<u8> {
+    pub fn handle(&self, path: &[u8]) -> HttpResponse {
         match self.routes.get(path) {
             Some(handler) => handler(path),
             None => (self.err_handler)(path),

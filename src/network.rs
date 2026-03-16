@@ -1,4 +1,3 @@
-use tokio::io::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{Duration, timeout};
@@ -8,12 +7,45 @@ pub enum RecvError {
     IoError,
 }
 
+pub struct SlidingBuffer {
+    storage: Vec<u8>,
+    head: usize,
+}
+
+impl SlidingBuffer {
+    pub fn new(size: usize) -> Self {
+        Self {
+            storage: vec![0u8; size],
+            head: 0,
+        }
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.storage[..self.head]
+    }
+
+    pub fn available_capacity(&self) -> usize {
+        self.storage.len() - self.head
+    }
+
+    pub fn write_area(&mut self) -> &mut [u8] {
+        &mut self.storage[self.head..]
+    }
+
+    pub fn shift_leftovers(&mut self, finished: usize) {
+        let leftover = self.head - finished;
+        if leftover > 0 {
+            self.storage.copy_within(finished..self.head, 0);
+        }
+        self.head = leftover;
+    }
+}
+
 /// Reads from a tcp stream into buffer.
 ///
 /// # Arguments
 /// * 'stream' - Mut ref to TcpStream to read from.
-/// * 'buf' - Mut ref to a buffer that stores what is read.
-/// * 'max_size' - Maximum bytes to read into buffer.
+/// * 'buf' - Mut ref to a SlidingBuffer.
 /// * 'timeout_secs' - Amount of time to wait for data.
 ///
 /// # Returns
@@ -23,41 +55,31 @@ pub enum RecvError {
 ///
 pub async fn get_msg(
     stream: &mut TcpStream,
-    buf: &mut [u8],
-    filled: &mut usize,
+    buf: &mut SlidingBuffer,
     timeout_secs: u64,
-) -> std::result::Result<usize, RecvError> {
-    let mut tmp = [0u8; 1024];
-    *filled = 0;
-
+) -> Result<usize, RecvError> {
     loop {
-        let result = timeout(Duration::from_secs(timeout_secs), stream.read(&mut tmp)).await;
+        if buf.available_capacity() == 0 {
+            return Err(RecvError::HeaderTooLarge);
+        }
 
-        match result {
-            Ok(Ok(n)) => {
-                if n == 0 {
-                    return Ok(0);
-                }
-
-                if *filled + n > buf.len() {
-                    return Err(RecvError::HeaderTooLarge);
-                }
-
-                let end = *filled + n;
-                buf[*filled..end].copy_from_slice(&tmp[..n]);
-                *filled = end;
-
-                if find_header_end(buf).is_some() {
-                    return Ok(buf.len());
-                }
-            }
+        let space = buf.write_area();
+        let n = match timeout(Duration::from_secs(timeout_secs), stream.read(space)).await {
+            Ok(Ok(0)) => return Ok(0),
+            Ok(Ok(n)) => n,
             Ok(Err(_)) => return Err(RecvError::IoError),
             Err(_) => return Ok(0),
         };
+
+        buf.head += n;
+
+        if let Some(pos) = find_header_end(buf.data()) {
+            return Ok(pos);
+        }
     }
 }
 
-pub async fn send_msg(msg: &[u8], stream: &mut TcpStream) -> Result<()> {
+pub async fn send_msg(msg: &[u8], stream: &mut TcpStream) -> tokio::io::Result<()> {
     stream.write_all(msg).await?;
     stream.flush().await?;
     Ok(())

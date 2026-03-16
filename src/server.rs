@@ -92,11 +92,10 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     }
 
     async fn handle_connection(&self, mut stream: TcpStream) {
-        let mut buf = [0u8; BUF_SIZE];
-        let mut filled = 0;
+        let mut buf = network::SlidingBuffer::new(BUF_SIZE);
 
         loop {
-            match network::get_msg(&mut stream, &mut buf, &mut filled, TIMEOUT_LEN).await {
+            let pos = match network::get_msg(&mut stream, &mut buf, TIMEOUT_LEN).await {
                 Err(network::RecvError::HeaderTooLarge) => {
                     info!("Header too large");
                     continue;
@@ -109,10 +108,10 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
                     info!("No data, dropping socket");
                     break;
                 }
-                Ok(_) => (),
+                Ok(n) => n,
             };
 
-            let p_msg = match self.protocol.parse(&buf) {
+            let p_msg = match self.protocol.parse(&buf.data()[..pos]) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
@@ -132,6 +131,8 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             if let Err(e) = network::send_msg(&f_resp, &mut stream).await {
                 warn!("Failed to send msg with error: {}", e);
             }
+
+            buf.shift_leftovers(pos);
         }
     }
 }

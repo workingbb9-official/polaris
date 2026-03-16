@@ -92,16 +92,17 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     }
 
     async fn handle_connection(&self, mut stream: TcpStream) {
-        let mut buf = Vec::with_capacity(BUF_SIZE);
+        let mut buf = [0u8; BUF_SIZE];
+        let mut filled = 0;
 
         loop {
-            match network::get_msg(&mut stream, &mut buf, BUF_SIZE, TIMEOUT_LEN).await {
+            match network::get_msg(&mut stream, &mut buf, &mut filled, TIMEOUT_LEN).await {
                 Err(network::RecvError::HeaderTooLarge) => {
                     info!("Header too large");
                     continue;
                 }
                 Err(network::RecvError::IoError) => {
-                    info!("Sys error with recieving");
+                    info!("Sys error with receiving");
                     continue;
                 }
                 Ok(0) => {

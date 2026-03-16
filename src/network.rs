@@ -23,12 +23,12 @@ pub enum RecvError {
 ///
 pub async fn get_msg(
     stream: &mut TcpStream,
-    buf: &mut Vec<u8>,
-    max_size: usize,
+    buf: &mut [u8],
+    filled: &mut usize,
     timeout_secs: u64,
 ) -> std::result::Result<usize, RecvError> {
     let mut tmp = [0u8; 1024];
-    buf.clear();
+    *filled = 0;
 
     loop {
         let result = timeout(Duration::from_secs(timeout_secs), stream.read(&mut tmp)).await;
@@ -39,11 +39,13 @@ pub async fn get_msg(
                     return Ok(0);
                 }
 
-                if buf.len() + n > max_size {
+                if *filled + n > buf.len() {
                     return Err(RecvError::HeaderTooLarge);
                 }
 
-                buf.extend_from_slice(&tmp[..n]);
+                let end = *filled + n;
+                buf[*filled..end].copy_from_slice(&tmp[..n]);
+                *filled = end;
 
                 if find_header_end(buf).is_some() {
                     return Ok(buf.len());

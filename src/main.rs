@@ -1,27 +1,7 @@
 use log::warn;
 use polaris::{HttpProtocol, Router, Server};
 use std::sync::Arc;
-
-static HTML_ABOUT: &str = r#"<!DOCTYPE html>
-    <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>About Polaris</h1>
-            <h2>Name: Comes from the North Star</h2>
-            <h2>Design: Async server with parsing and handling</h2>
-        </body>
-    </html>
-    "#;
-
-static HTML_HOME: &str = r#"<!DOCTYPE html>
-   <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>Hello From Polaris<h1>
-            <h2>A general purpose web-server<h2>
-        </body>
-    </html>
-    "#;
+use std::fs;
 
 static HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     <html>
@@ -41,8 +21,10 @@ async fn main() {
     let protocol = HttpProtocol;
 
     let mut router = Router::new();
-    router.add_route(b"/", handle_home);
-    router.add_route(b"/about", handle_about);
+    router.add_route(b"/", home_html);
+    router.add_route(b"/style.css", home_css);
+    router.add_route(b"/script.js", home_js);
+    router.add_route(b"/about", about_html);
     router.add_err_handler(handle_error);
 
     let server = Server::new(port, protocol, router)
@@ -56,12 +38,24 @@ async fn main() {
     }
 }
 
-fn handle_home(_: &[u8]) -> Vec<u8> {
-    HTML_HOME.as_bytes().to_vec()
+fn home_html(_: &[u8]) -> Vec<u8> {
+    let bytes = fs::read("static/index.html");
+    bytes.expect("No way ts didn't work")
 }
 
-fn handle_about(_: &[u8]) -> Vec<u8> {
-    HTML_ABOUT.as_bytes().to_vec()
+fn home_css(_: &[u8]) -> Vec<u8> {
+    let bytes = fs::read("static/style.css");
+    bytes.expect("No way ts didn't work")
+}
+
+fn home_js(_: &[u8]) -> Vec<u8> {
+    let bytes = fs::read("static/script.js");
+    bytes.expect("No way ts didn't work")
+}
+
+fn about_html(_: &[u8]) -> Vec<u8> {
+    let bytes = fs::read("static/about.html");
+    bytes.expect("No way ts didn't work")
 }
 
 fn handle_error(_: &[u8]) -> Vec<u8> {

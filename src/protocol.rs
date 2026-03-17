@@ -6,6 +6,9 @@ pub trait Protocol {
 pub struct HttpProtocol;
 
 impl Protocol for HttpProtocol {
+    /// Split http request and return path.
+    ///
+    /// This assumes GET method, will be added to in future.
     fn parse(&self, raw: &[u8]) -> Option<Vec<u8>> {
         let request = match std::str::from_utf8(raw) {
             Ok(s) => s,
@@ -22,6 +25,7 @@ impl Protocol for HttpProtocol {
         Some(path.as_bytes().to_vec())
     }
 
+    /// Create a full response header from body and content type.
     fn format(&self, response: &HttpResponse) -> Vec<u8> {
         let header = format!(
             "HTTP/1.1 200 OK\r\n\
@@ -36,7 +40,9 @@ impl Protocol for HttpProtocol {
 
         let mut final_response = header.into_bytes();
 
+        // Add body after header
         final_response.extend(&response.body);
+
         final_response
     }
 }

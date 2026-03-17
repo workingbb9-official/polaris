@@ -29,7 +29,7 @@ fn default_err_handler(_: &[u8]) -> HttpResponse {
     HttpResponse::new(body, "text/html".to_string())
 }
 
-/// Used to map a path to an action and response.
+/// Use to map a path to an action and response.
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
     err_handler: Handler,

@@ -1,4 +1,3 @@
-// static/script.js
 document.addEventListener('DOMContentLoaded', () => {
     const statusSpan = document.querySelector('#status span');
     const testBtn = document.getElementById('testBtn');
@@ -10,11 +9,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Interaction test
     testBtn.addEventListener('click', () => {
-        alert("JavaScript is working! Your Rust server served this file successfully.");
-        
-        // Let's do something fun to the UI
+        // Change the UI first so the user sees a "flash" of success
         document.querySelector('.container').style.borderColor = '#10b981';
-        testBtn.textContent = "Test Successful!";
+        testBtn.textContent = "Redirecting...";
         testBtn.style.backgroundColor = "#10b981";
+
+        // 3. Move the URL to the /about page
+        // We use a small timeout so the user actually sees the button change 
+        // before the page vanishes.
+        setTimeout(() => {
+            window.location.href = '/about';
+        }, 500); 
     });
 });

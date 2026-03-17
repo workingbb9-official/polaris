@@ -28,10 +28,12 @@ impl SlidingBuffer {
         self.storage.len() - self.head
     }
 
+    /// Return space open for writing.
     pub fn write_area(&mut self) -> &mut [u8] {
         &mut self.storage[self.head..]
     }
 
+    /// Move leftover data to start of the buffer.
     pub fn shift_leftovers(&mut self, finished: usize) {
         let leftover = self.head - finished;
         if leftover > 0 {
@@ -41,7 +43,7 @@ impl SlidingBuffer {
     }
 }
 
-/// Reads from a tcp stream into buffer.
+/// Read from a tcp stream into buffer.
 ///
 /// # Arguments
 /// * 'stream' - Mut ref to TcpStream to read from.
@@ -79,6 +81,16 @@ pub async fn get_msg(
     }
 }
 
+/// Write a message to a tcp stream.
+///
+/// # Arguments
+/// * 'msg' - Binary slice to send.
+/// * 'stream' - Mut ref to TcpStream to write to.
+///
+/// # Returns
+/// * 'Ok(())' - Message sent successfully.
+/// * 'Err(_)' - Failed to write or flush stream.
+///
 pub async fn send_msg(msg: &[u8], stream: &mut TcpStream) -> tokio::io::Result<()> {
     stream.write_all(msg).await?;
     stream.flush().await?;

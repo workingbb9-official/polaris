@@ -126,31 +126,32 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             };
 
             // Parse received data
-            let p_msg = match self.protocol.parse(&network.buf.data()[..pos]) {
+            let request = &network.data()[..pos];
+            let p_msg = match self.protocol.parse(request) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
                     let bad_req = b"HTTP/1.1 400 Bad Request\r\n\
                                    Connection: close\r\n\r\n";
 
-                    if let Err(e) = network::send_msg(bad_req, &mut network.stream).await {
+                    if let Err(e) = network.write(bad_req).await {
                         warn!("Failed to send msg with error: {}", e);
                     }
                     break;
                 }
             };
 
-            // Lookup handler for path and format response
+            // Look up handler and format response
             let resp = self.router.handle(&p_msg);
             let f_resp = self.protocol.format(&resp);
 
-            // Send message
-            if let Err(e) = network::send_msg(&f_resp, &mut network.stream).await {
+            // Send response
+            if let Err(e) = network.write(&f_resp).await {
                 warn!("Failed to send msg with error: {}", e);
             }
 
-            // Move leftovers from next request to start of buffer
-            network.buf.shift_leftovers(pos);
+            // Reset network for next read
+            network.reset(pos);
         }
     }
 }

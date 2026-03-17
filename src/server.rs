@@ -102,13 +102,15 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     ///
     /// Receive bytes, parse, handle, format and send response.
     ///
-    async fn handle_connection(&self, mut stream: TcpStream) {
-        let mut buf = network::SlidingBuffer::new(BUF_SIZE);
+    async fn handle_connection(&self, stream: TcpStream) {
+        let buf = network::SlidingBuffer::new(BUF_SIZE);
+        let config = network::NetworkConfig::new(TIMEOUT_LEN);
+        let mut network = network::Network::new(stream, buf, config);
 
         loop {
             // Receive from socket
-            let pos = match network::get_msg(&mut stream, &mut buf, TIMEOUT_LEN).await {
-                Err(network::RecvError::HeaderTooLarge) => {
+            let pos = match network.read_until(b"\r\n\r\n").await {
+                Err(network::RecvError::DelimiterNotFound) => {
                     info!("Header too large");
                     continue;
                 }
@@ -124,14 +126,14 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             };
 
             // Parse received data
-            let p_msg = match self.protocol.parse(&buf.data()[..pos]) {
+            let p_msg = match self.protocol.parse(&network.buf.data()[..pos]) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
                     let bad_req = b"HTTP/1.1 400 Bad Request\r\n\
                                    Connection: close\r\n\r\n";
 
-                    if let Err(e) = network::send_msg(bad_req, &mut stream).await {
+                    if let Err(e) = network::send_msg(bad_req, &mut network.stream).await {
                         warn!("Failed to send msg with error: {}", e);
                     }
                     break;
@@ -143,12 +145,12 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             let f_resp = self.protocol.format(&resp);
 
             // Send message
-            if let Err(e) = network::send_msg(&f_resp, &mut stream).await {
+            if let Err(e) = network::send_msg(&f_resp, &mut network.stream).await {
                 warn!("Failed to send msg with error: {}", e);
             }
 
             // Move leftovers from next request to start of buffer
-            buf.shift_leftovers(pos);
+            network.buf.shift_leftovers(pos);
         }
     }
 }

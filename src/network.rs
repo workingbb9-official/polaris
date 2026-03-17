@@ -2,9 +2,65 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{Duration, timeout};
 
+pub struct Network {
+    pub stream: TcpStream,
+    pub buf: SlidingBuffer,
+    config: NetworkConfig,
+}
+
+impl Network {
+    pub fn new(stream: TcpStream, buf: SlidingBuffer, config: NetworkConfig) -> Self {
+        Network {
+            stream,
+            buf,
+            config,
+        }
+    }
+
+    pub async fn read_until(&mut self, delimiter: &[u8]) -> Result<usize, RecvError> {
+        loop {
+            let capacity = self.buf.available_capacity();
+            if capacity == 0 {
+                return Err(RecvError::DelimiterNotFound);
+            }
+            
+            let space = self.buf.write_area();
+            let n = match timeout(Duration::from_secs(self.config.timeout), self.stream.read(space)).await {
+                Ok(Ok(0)) => return Ok(0),
+                Ok(Ok(n)) => n,
+                Ok(Err(_)) => return Err(RecvError::IoError),
+                Err(_) => return Ok(0),
+            };
+
+            self.buf.head += n;
+            
+            if let Some(pos) = self.find_delimiter(delimiter) {
+                return Ok(pos);
+            }
+        }
+    }
+
+    fn find_delimiter(&self, delimiter: &[u8]) -> Option<usize> {
+        let filled = self.buf.data();
+        filled.windows(4).position(|w| w == delimiter).map(|i| i + 4)
+    }
+}
+
 pub enum RecvError {
-    HeaderTooLarge,
+    DelimiterNotFound,
     IoError,
+}
+
+pub struct NetworkConfig {
+    timeout: u64,
+}
+
+impl NetworkConfig {
+    pub fn new(timeout: u64) -> Self {
+        NetworkConfig {
+            timeout,
+        }
+    }
 }
 
 pub struct SlidingBuffer {
@@ -43,6 +99,7 @@ impl SlidingBuffer {
     }
 }
 
+/*
 /// Read from a tcp stream into buffer.
 ///
 /// # Arguments
@@ -80,6 +137,7 @@ pub async fn get_msg(
         }
     }
 }
+*/
 
 /// Write a message to a tcp stream.
 ///
@@ -97,6 +155,8 @@ pub async fn send_msg(msg: &[u8], stream: &mut TcpStream) -> tokio::io::Result<(
     Ok(())
 }
 
+/*
 fn find_header_end(buf: &[u8]) -> Option<usize> {
     buf.windows(4).position(|w| w == b"\r\n\r\n").map(|i| i + 4)
 }
+*/

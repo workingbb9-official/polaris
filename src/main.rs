@@ -1,27 +1,7 @@
 use log::warn;
-use polaris::{HttpProtocol, Router, Server};
+use polaris::{HttpProtocol, HttpResponse, Router, Server};
+use std::fs;
 use std::sync::Arc;
-
-static HTML_ABOUT: &str = r#"<!DOCTYPE html>
-    <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>About Polaris</h1>
-            <h2>Name: Comes from the North Star</h2>
-            <h2>Design: Async server with parsing and handling</h2>
-        </body>
-    </html>
-    "#;
-
-static HTML_HOME: &str = r#"<!DOCTYPE html>
-   <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>Hello From Polaris<h1>
-            <h2>A general purpose web-server<h2>
-        </body>
-    </html>
-    "#;
 
 static HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     <html>
@@ -41,8 +21,10 @@ async fn main() {
     let protocol = HttpProtocol;
 
     let mut router = Router::new();
-    router.add_route(b"/", handle_home);
-    router.add_route(b"/about", handle_about);
+    router.add_route(b"/", home_html);
+    router.add_route(b"/style.css", home_css);
+    router.add_route(b"/script.js", home_js);
+    router.add_route(b"/about", about_html);
     router.add_err_handler(handle_error);
 
     let server = Server::new(port, protocol, router)
@@ -56,14 +38,26 @@ async fn main() {
     }
 }
 
-fn handle_home(_: &[u8]) -> Vec<u8> {
-    HTML_HOME.as_bytes().to_vec()
+fn home_html(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/index.html").unwrap();
+    HttpResponse::new(bytes, "text/html".to_string())
 }
 
-fn handle_about(_: &[u8]) -> Vec<u8> {
-    HTML_ABOUT.as_bytes().to_vec()
+fn home_css(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/style.css").unwrap();
+    HttpResponse::new(bytes, "text/css".to_string())
 }
 
-fn handle_error(_: &[u8]) -> Vec<u8> {
-    HTML_NOT_FOUND.as_bytes().to_vec()
+fn home_js(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/script.js").unwrap();
+    HttpResponse::new(bytes, "application/javascript".to_string())
+}
+
+fn about_html(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/about.html").unwrap();
+    HttpResponse::new(bytes, "text/html".to_string())
+}
+
+fn handle_error(_: &[u8]) -> HttpResponse {
+    HttpResponse::new(HTML_NOT_FOUND.as_bytes().to_vec(), "text/html".to_string())
 }

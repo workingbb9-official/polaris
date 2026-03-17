@@ -25,6 +25,7 @@ async fn main() {
     router.add_route(b"/style.css", home_css);
     router.add_route(b"/script.js", home_js);
     router.add_route(b"/about", about_html);
+    router.add_route(b"/about.js", about_js);
     router.add_err_handler(handle_error);
 
     let server = Server::new(port, protocol, router)
@@ -55,6 +56,11 @@ fn home_js(_: &[u8]) -> HttpResponse {
 
 fn about_html(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("static/about.html").unwrap();
+    HttpResponse::new(bytes, "text/html".to_string())
+}
+
+fn about_js(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("static/about.js").unwrap();
     HttpResponse::new(bytes, "text/html".to_string())
 }
 

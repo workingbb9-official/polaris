@@ -112,11 +112,11 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             let pos = match network.read_until(b"\r\n\r\n").await {
                 Err(network::RecvError::DelimiterNotFound) => {
                     info!("Header too large");
-                    continue;
+                    break;
                 }
                 Err(network::RecvError::IoError) => {
                     info!("Sys error with receiving");
-                    continue;
+                    break;
                 }
                 Ok(0) => {
                     info!("No data, dropping socket");

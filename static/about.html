@@ -1,9 +1,28 @@
 <!DOCTYPE html>
-<html>
-    <head><title>Polaris</title></head>
-    <body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Polaris | About</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
         <h1>About Polaris</h1>
-        <h2>Async server with parsing and handling</h2>
-        <h2>General purpose for HTTP, TCP, etc</h2>
-    </body>
+        <p class="subtitle">High-Performance Rust Networking</p>
+
+        <section class="features">
+            <div class="feature-card">
+                <h3>Async Core</h3>
+                <p>Non-blocking I/O for maximum throughput.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Multi-Protocol</h3>
+                <p>Generic handling for HTTP, TCP, and custom binary streams.</p>
+            </div>
+        </section>
+
+        <button id="backBtn">← Return Home</button>
+    </div>
+    <script src="about.js"></script>
+</body>
 </html>

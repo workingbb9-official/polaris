@@ -1,5 +1,5 @@
 use crate::network;
-use crate::protocol::{HttpResponse, Protocol};
+use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
 
 use log::{info, warn};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 
-type Handler = fn(&[u8]) -> HttpResponse;
+type Handler = fn(&[u8]) -> ProtocolResponse;
 
 static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
     <html>
@@ -23,10 +23,16 @@ const BUF_SIZE: usize = 8192;
 const TIMEOUT_LEN: u64 = 5;
 
 /// Set default as simple html page.
-fn default_err_handler(_: &[u8]) -> HttpResponse {
+fn default_err_handler(_: &[u8]) -> ProtocolResponse {
     let body = DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec();
 
-    HttpResponse::new(body, "text/html".to_string())
+    let http_resp = ProtocolResponse::new_http(
+        "HTTP/1.1 404 Not Found".to_string(),
+        body,
+        "text/html".to_string(),
+    );
+
+    http_resp
 }
 
 /// Use to map a path to an action and response.
@@ -53,7 +59,7 @@ impl Router {
     }
 
     /// Map a path to given handler.
-    pub fn handle(&self, path: &[u8]) -> HttpResponse {
+    pub fn handle(&self, path: &[u8]) -> ProtocolResponse {
         match self.routes.get(path) {
             Some(handler) => handler(path),
             None => (self.err_handler)(path),
@@ -126,8 +132,8 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             };
 
             // Parse received data
-            let request = &network.data()[..pos];
-            let p_msg = match self.protocol.parse(request) {
+            let raw = &network.data()[..pos];
+            let request = match self.protocol.parse_req(raw.to_vec()) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
@@ -142,8 +148,15 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             };
 
             // Look up handler and format response
-            let resp = self.router.handle(&p_msg);
-            let f_resp = self.protocol.format(&resp);
+            let resp = match request {
+                ProtocolRequest::Http(req) => {
+                    let path = req.path().as_bytes();
+                    self.router.handle(path)
+                }
+                ProtocolRequest::Raw(vec) => self.router.handle(&vec),
+            };
+
+            let f_resp = self.protocol.format_resp(resp);
 
             // Send response
             if let Err(e) = network.write(&f_resp).await {

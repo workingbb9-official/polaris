@@ -3,16 +3,6 @@ use polaris::{HttpProtocol, ProtocolResponse, Router, Server};
 use std::fs;
 use std::sync::Arc;
 
-static HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
-    <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>404 Not Found</h1>
-            <h2>That URL doesn't exist</h2>
-        </body>
-    </html>
-    "#;
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -26,7 +16,6 @@ async fn main() {
     router.add_route(b"/script.js", home_js);
     router.add_route(b"/about", about_html);
     router.add_route(b"/about.js", about_js);
-    router.add_err_handler(handle_error);
 
     let server = Server::new(port, protocol, router)
         .await
@@ -41,8 +30,7 @@ async fn main() {
 
 fn home_html(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/index.html").unwrap();
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
+    ProtocolResponse::FileFound {
         content_type: "text/html".to_string(),
         body: bytes,
     }
@@ -50,8 +38,7 @@ fn home_html(_: &[u8]) -> ProtocolResponse {
 
 fn home_css(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/style.css").unwrap();
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
+    ProtocolResponse::FileFound {
         content_type: "text/css".to_string(),
         body: bytes,
     }
@@ -59,8 +46,7 @@ fn home_css(_: &[u8]) -> ProtocolResponse {
 
 fn home_js(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/script.js").unwrap();
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
+    ProtocolResponse::FileFound {
         content_type: "application/javascript".to_string(),
         body: bytes,
     }
@@ -68,8 +54,7 @@ fn home_js(_: &[u8]) -> ProtocolResponse {
 
 fn about_html(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/about.html").unwrap();
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
+    ProtocolResponse::FileFound {
         content_type: "text/html".to_string(),
         body: bytes,
     }
@@ -77,17 +62,8 @@ fn about_html(_: &[u8]) -> ProtocolResponse {
 
 fn about_js(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/about.js").unwrap();
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
+    ProtocolResponse::FileFound {
         content_type: "text/html".to_string(),
         body: bytes,
-    }
-}
-
-fn handle_error(_: &[u8]) -> ProtocolResponse {
-    ProtocolResponse::Http {
-        status: "Http/1.1 200 OK".to_string(),
-        content_type: "text/html".to_string(),
-        body: HTML_NOT_FOUND.as_bytes().to_vec(),
     }
 }

@@ -26,27 +26,37 @@ impl Protocol for HttpProtocol {
     /// Create a binary response header from HttpResponse.
     fn serialize_resp(&self, response: ProtocolResponse) -> Vec<u8> {
         match response {
-            ProtocolResponse::Http {
-                status,
-                body,
-                content_type,
-            } => serialize_http(&status, &content_type, body),
-            _ => Vec::new(),
+            ProtocolResponse::FileFound { content_type, body } => {
+                serialize_http("HTTP/1.1 200 OK", &content_type, "keep-alive", body)
+            }
+            ProtocolResponse::FileNotFound => serialize_http(
+                "HTTP/1.1 404 Not Found",
+                "keep-alive",
+                "text/plain",
+                b"Polaris\nFile Not Found".to_vec(),
+            ),
+            ProtocolResponse::BadRequest => serialize_http(
+                "HTTP/1.1 400 Bad Request",
+                "text/plain",
+                "close",
+                b"Polaris\nBad Request".to_vec(),
+            ),
         }
     }
 }
 
-fn serialize_http(status: &str, content_type: &str, body: Vec<u8>) -> Vec<u8> {
+fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -> Vec<u8> {
     let header = format!(
         "{}\r\n\
             Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
             Content-Length: {}\r\n\
             Content-Type: {}\r\n\
-            Connection: keep-alive\r\n\
+            Connection: {}\r\n\
             \r\n",
         status,
         body.len(),
         content_type,
+        conn,
     );
 
     let mut final_response = header.into_bytes();

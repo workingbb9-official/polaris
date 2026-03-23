@@ -10,40 +10,18 @@ use tokio::net::{TcpListener, TcpStream};
 
 type Handler = fn(&[u8]) -> ProtocolResponse;
 
-static DEFAULT_HTML_NOT_FOUND: &str = r#"<!DOCTYPE html>
-    <html>
-        <head><title>Polaris</title></head>
-        <body>
-            <h1>404 Not Found</h1>
-        </body>
-    </html>
-    "#;
-
 const BUF_SIZE: usize = 8192;
 const TIMEOUT_LEN: u64 = 5;
-
-/// Set default as simple html page.
-fn default_err_handler(_: &[u8]) -> ProtocolResponse {
-    let body = DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec();
-
-    ProtocolResponse::Http {
-        status: "HTTP/1.1 404 Not Found".to_string(),
-        content_type: "text/html".to_string(),
-        body,
-    }
-}
 
 /// Use to map a path to an action and response.
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
-    err_handler: Handler,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
             routes: HashMap::new(),
-            err_handler: default_err_handler,
         }
     }
 
@@ -51,16 +29,11 @@ impl Router {
         self.routes.insert(path.into(), handler);
     }
 
-    /// Set error handler for path not found.
-    pub fn add_err_handler(&mut self, handler: Handler) {
-        self.err_handler = handler;
-    }
-
     /// Map a path to given handler.
     pub fn handle(&self, path: &[u8]) -> ProtocolResponse {
         match self.routes.get(path) {
             Some(handler) => handler(path),
-            None => (self.err_handler)(path),
+            None => ProtocolResponse::FileNotFound,
         }
     }
 }
@@ -116,15 +89,15 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
             let pos = match network.read_until(b"\r\n\r\n").await {
                 Err(network::RecvError::DelimiterNotFound) => {
                     info!("Header too large");
-                    break;
+                    return;
                 }
                 Err(network::RecvError::IoError) => {
                     info!("Sys error with receiving");
-                    break;
+                    return;
                 }
                 Ok(0) => {
                     info!("No data, dropping socket");
-                    break;
+                    return;
                 }
                 Ok(n) => n,
             };
@@ -135,13 +108,14 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
-                    let bad_req = b"HTTP/1.1 400 Bad Request\r\n\
-                                   Connection: close\r\n\r\n";
+                    let bad_resp = ProtocolResponse::BadRequest;
+                    let raw_resp = self.protocol.serialize_resp(bad_resp);
 
-                    if let Err(e) = network.write(bad_req).await {
+                    if let Err(e) = network.write(&raw_resp).await {
                         warn!("Failed to send msg with error: {}", e);
                     }
-                    break;
+
+                    return;
                 }
             };
 

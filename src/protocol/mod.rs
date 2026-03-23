@@ -16,10 +16,7 @@ pub enum ProtocolRequest {
 }
 
 pub enum ProtocolResponse {
-    Http {
-        status: String,
-        content_type: String,
-        body: Vec<u8>,
-    },
-    Raw(Vec<u8>),
+    FileFound { content_type: String, body: Vec<u8> },
+    FileNotFound,
+    BadRequest,
 }

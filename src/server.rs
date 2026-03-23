@@ -26,13 +26,11 @@ const TIMEOUT_LEN: u64 = 5;
 fn default_err_handler(_: &[u8]) -> ProtocolResponse {
     let body = DEFAULT_HTML_NOT_FOUND.as_bytes().to_vec();
 
-    let http_resp = ProtocolResponse::new_http(
-        "HTTP/1.1 404 Not Found".to_string(),
+    ProtocolResponse::Http {
+        status: "HTTP/1.1 404 Not Found".to_string(),
+        content_type: "text/html".to_string(),
         body,
-        "text/html".to_string(),
-    );
-
-    http_resp
+    }
 }
 
 /// Use to map a path to an action and response.
@@ -149,17 +147,17 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
 
             // Look up handler and format response
             let resp = match request {
-                ProtocolRequest::Http(req) => {
-                    let path = req.path().as_bytes();
+                ProtocolRequest::Http { path, .. } => {
+                    let path = path.as_bytes();
                     self.router.handle(path)
                 }
                 ProtocolRequest::Raw(vec) => self.router.handle(&vec),
             };
 
-            let f_resp = self.protocol.format_resp(resp);
+            let raw_resp = self.protocol.serialize_resp(resp);
 
             // Send response
-            if let Err(e) = network.write(&f_resp).await {
+            if let Err(e) = network.write(&raw_resp).await {
                 warn!("Failed to send msg with error: {}", e);
             }
 

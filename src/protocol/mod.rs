@@ -1,9 +1,14 @@
 mod http;
+use crate::network::Network;
 pub use http::HttpProtocol;
+use log::info;
 
-pub trait Protocol {
-    fn parse_req(&self, raw: Vec<u8>) -> Option<ProtocolRequest>;
-    fn serialize_resp(&self, response: ProtocolResponse) -> Vec<u8>;
+#[trait_variant::make(Protocol: Send)]
+pub trait _P {
+    async fn read(&self, network: &mut Network) -> Option<Vec<u8>>;
+
+    fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest>;
+    fn serialize(&self, response: ProtocolResponse) -> Vec<u8>;
 }
 
 pub enum ProtocolRequest {

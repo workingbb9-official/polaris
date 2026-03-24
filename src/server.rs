@@ -1,7 +1,7 @@
 use crate::network;
 use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
 
-use log::{info, warn};
+use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -30,10 +30,19 @@ impl Router {
     }
 
     /// Map a path to given handler.
-    pub fn handle(&self, path: &[u8]) -> ProtocolResponse {
-        match self.routes.get(path) {
-            Some(handler) => handler(path),
-            None => ProtocolResponse::FileNotFound,
+    pub fn handle(&self, msg: ProtocolRequest) -> ProtocolResponse {
+        match msg {
+            ProtocolRequest::Http { path, .. } => {
+                let raw = path.into_bytes();
+                match self.routes.get(&raw) {
+                    Some(handler) => handler(&raw),
+                    None => ProtocolResponse::FileNotFound,
+                }
+            }
+            ProtocolRequest::Raw(raw) => match self.routes.get(&raw) {
+                Some(handler) => handler(&raw),
+                None => ProtocolResponse::FileNotFound,
+            },
         }
     }
 }
@@ -50,7 +59,7 @@ pub struct Server<P: Protocol> {
     router: Router,
 }
 
-impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
+impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     pub async fn new(addr: &str, protocol: P, router: Router) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
@@ -66,7 +75,6 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     pub async fn run(self: Arc<Self>) -> tokio::io::Result<()> {
         loop {
             let (stream, _) = self.listener.accept().await?;
-            info!("Connected to client");
 
             let server_ptr = Arc::clone(&self);
             tokio::spawn(async move {
@@ -80,31 +88,18 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
     /// Receive bytes, parse, handle, format and send response.
     ///
     async fn handle_connection(&self, stream: TcpStream) {
+        info!("Connected to client");
         let buf = network::SlidingBuffer::new(BUF_SIZE);
         let config = network::NetworkConfig::new(TIMEOUT_LEN);
-        let mut network = network::Network::new(stream, buf, config);
+        let network = network::Network::new(stream, buf, config);
 
-        loop {
-            // Receive from socket
-            let pos = match network.read_until(b"\r\n\r\n").await {
-                Err(network::RecvError::DelimiterNotFound) => {
-                    info!("Header too large");
-                    return;
-                }
-                Err(network::RecvError::IoError) => {
-                    info!("Sys error with receiving");
-                    return;
-                }
-                Ok(0) => {
-                    info!("No data, dropping socket");
-                    return;
-                }
-                Ok(n) => n,
-            };
+        self.connection_loop(network).await;
+        info!("Dropping connection");
+        /* loop {
+            let raw = self.protocol.read(&mut network);
 
             // Parse received data
-            let raw = &network.data()[..pos];
-            let request = match self.protocol.parse_req(raw.to_vec()) {
+            let request = match self.protocol.parse_req(raw) {
                 Some(p) => p,
                 None => {
                     warn!("Failed to parse msg");
@@ -137,6 +132,16 @@ impl<P: Protocol + std::marker::Sync + std::marker::Send + 'static> Server<P> {
 
             // Reset network for next read
             network.reset(pos);
+        } */
+    }
+
+    async fn connection_loop(&self, mut network: network::Network) -> Option<()> {
+        loop {
+            let raw = self.protocol.read(&mut network).await?;
+            let msg = self.protocol.parse(raw)?;
+            let outcome = self.router.handle(msg);
+            let response = self.protocol.serialize(outcome);
+            network.write(&response).await.ok()?;
         }
     }
 }

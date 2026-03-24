@@ -1,11 +1,32 @@
 use super::*;
+use crate::network::{Network, RecvError};
 
 pub struct HttpProtocol;
 impl Protocol for HttpProtocol {
-    /// Split http request and pack into struct.
-    ///
-    /// Assumes GET method for now.
-    fn parse_req(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
+    async fn read(&self, network: &mut Network) -> Option<Vec<u8>> {
+        let pos = match network.read_until(b"\r\n\r\n").await {
+            Err(RecvError::DelimiterNotFound) => {
+                info!("HTTP header too large");
+                return None;
+            }
+            Err(RecvError::IoError) => {
+                info!("IO error when reading");
+                return None;
+            }
+            Ok(0) => {
+                info!("No data received");
+                return None;
+            }
+            Ok(n) => n,
+        };
+
+        let data = network.data()[..pos].to_vec();
+        network.reset(pos);
+
+        Some(data)
+    }
+
+    fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
         let request = String::from_utf8(raw).ok()?;
 
         let first_line = request.lines().next()?;
@@ -23,8 +44,7 @@ impl Protocol for HttpProtocol {
         Some(http_req)
     }
 
-    /// Create a binary response header from HttpResponse.
-    fn serialize_resp(&self, response: ProtocolResponse) -> Vec<u8> {
+    fn serialize(&self, response: ProtocolResponse) -> Vec<u8> {
         match response {
             ProtocolResponse::FileFound { content_type, body } => {
                 serialize_http("HTTP/1.1 200 OK", &content_type, "keep-alive", body)

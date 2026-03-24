@@ -61,11 +61,12 @@ impl Network {
     }
 
     fn find_delimiter(&self, delimiter: &[u8]) -> Option<usize> {
-        let filled = self.buf.data();
-        filled
-            .windows(4)
+        let len = delimiter.len();
+        self.buf
+            .data()
+            .windows(len)
             .position(|w| w == delimiter)
-            .map(|i| i + 4)
+            .map(|i| i + len)
     }
 }
 

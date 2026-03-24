@@ -63,7 +63,7 @@ fn about_html(_: &[u8]) -> ProtocolResponse {
 fn about_js(_: &[u8]) -> ProtocolResponse {
     let bytes = fs::read("static/about.js").unwrap();
     ProtocolResponse::FileFound {
-        content_type: "text/html".to_string(),
+        content_type: "application/javascript".to_string(),
         body: bytes,
     }
 }

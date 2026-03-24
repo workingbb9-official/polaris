@@ -95,44 +95,6 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
 
         self.connection_loop(network).await;
         info!("Dropping connection");
-        /* loop {
-            let raw = self.protocol.read(&mut network);
-
-            // Parse received data
-            let request = match self.protocol.parse_req(raw) {
-                Some(p) => p,
-                None => {
-                    warn!("Failed to parse msg");
-                    let bad_resp = ProtocolResponse::BadRequest;
-                    let raw_resp = self.protocol.serialize_resp(bad_resp);
-
-                    if let Err(e) = network.write(&raw_resp).await {
-                        warn!("Failed to send msg with error: {}", e);
-                    }
-
-                    return;
-                }
-            };
-
-            // Look up handler and format response
-            let resp = match request {
-                ProtocolRequest::Http { path, .. } => {
-                    let path = path.as_bytes();
-                    self.router.handle(path)
-                }
-                ProtocolRequest::Raw(vec) => self.router.handle(&vec),
-            };
-
-            let raw_resp = self.protocol.serialize_resp(resp);
-
-            // Send response
-            if let Err(e) = network.write(&raw_resp).await {
-                warn!("Failed to send msg with error: {}", e);
-            }
-
-            // Reset network for next read
-            network.reset(pos);
-        } */
     }
 
     async fn connection_loop(&self, mut network: network::Network) -> Option<()> {

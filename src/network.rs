@@ -19,12 +19,12 @@ impl Network {
 
     pub async fn read_until(&mut self, delimiter: &[u8]) -> Result<usize, RecvError> {
         loop {
-            let capacity = self.buf.available_capacity();
-            if capacity == 0 {
+            let space = self.buf.free_space();
+
+            if space.is_empty() {
                 return Err(RecvError::DelimiterNotFound);
             }
 
-            let space = self.buf.write_area();
             let n = match timeout(
                 Duration::from_secs(self.config.timeout),
                 self.stream.read(space),
@@ -42,6 +42,30 @@ impl Network {
             if let Some(pos) = self.find_delimiter(delimiter) {
                 return Ok(pos);
             }
+        }
+    }
+
+    /// Returns # of bytes read.
+    /// Could be less than 'bytes' if buffer is not large enough.
+    pub async fn read_exact(&mut self, bytes: usize) -> Result<usize, RecvError> {
+        let space = self.buf.free_space();
+
+        let n = if space.len() < bytes {
+            space.len()
+        } else {
+            bytes
+        };
+
+        match timeout(
+            Duration::from_secs(self.config.timeout),
+            self.stream.read(&mut space[..n]),
+        ).await {
+            Ok(Ok(n)) => {
+                self.buf.head += n;
+                Ok(n)
+            }
+            Ok(Err(_)) => Err(RecvError::IoError),
+            Err(_) => Ok(0),
         }
     }
 
@@ -102,16 +126,10 @@ impl SlidingBuffer {
         &self.storage[..self.head]
     }
 
-    pub fn available_capacity(&self) -> usize {
-        self.storage.len() - self.head
-    }
-
-    /// Return space open for writing.
-    pub fn write_area(&mut self) -> &mut [u8] {
+    pub fn free_space(&mut self) -> &mut [u8] {
         &mut self.storage[self.head..]
     }
 
-    /// Move leftover data to start of the buffer.
     pub fn shift_leftovers(&mut self, finished: usize) {
         let leftover = self.head - finished;
         if leftover > 0 {

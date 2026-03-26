@@ -17,17 +17,17 @@ impl Network {
         }
     }
 
-    pub async fn read(&mut self) -> RecvResult {
+    pub async fn read(&mut self) -> ReadResult {
         match timeout(
             Duration::from_secs(self.config.timeout),
             self.stream.read(&mut self.buf.storage),
         )
         .await
         {
-            Ok(Ok(0)) => RecvResult::NoData,
-            Ok(Ok(_)) => RecvResult::BufferFull,
-            Err(_) => RecvResult::Timeout,
-            Ok(Err(_)) => RecvResult::IoError,
+            Ok(Ok(0)) => ReadResult::NoData,
+            Ok(Ok(_)) => ReadResult::BufferFull,
+            Err(_) => ReadResult::Timeout,
+            Ok(Err(_)) => ReadResult::IoError,
         }
     }
 
@@ -47,7 +47,7 @@ impl Network {
     }
 }
 
-pub enum RecvResult {
+pub enum ReadResult {
     BufferFull,
     NoData,
     Timeout,

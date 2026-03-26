@@ -1,7 +1,8 @@
-use crate::network;
+use crate::network::{Network, NetworkConfig, ReadResult};
+use crate::protocol::Framing;
 use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
 
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -85,20 +86,59 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
 
     async fn handle_connection(&self, stream: TcpStream) {
         info!("Connected to client");
-        let config = network::NetworkConfig::new(TIMEOUT_LEN, BUF_SIZE);
-        let network = network::Network::new(stream, config);
+        let config = NetworkConfig::new(TIMEOUT_LEN, BUF_SIZE);
+        let network = Network::new(stream, config);
 
         self.connection_loop(network).await;
         info!("Dropping connection");
     }
 
-    async fn connection_loop(&self, mut network: network::Network) -> Option<()> {
+    async fn connection_loop(&self, mut network: Network) -> Option<()> {
         loop {
-            let raw = self.protocol.read(&mut network).await?;
+            let raw = self.net_read(&mut network).await?;
             let msg = self.protocol.parse(raw)?;
             let outcome = self.router.handle(msg);
             let response = self.protocol.serialize(outcome);
             network.write(&response).await.ok()?;
         }
     }
+
+    async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
+        match network.read().await {
+            ReadResult::NoData => {
+                info!("Received no data");
+                return None;
+            }
+            ReadResult::Timeout => {
+                info!("Connection timed out");
+                return None;
+            }
+            ReadResult::IoError => {
+                warn!("IO error when reading");
+                return None;
+            }
+            ReadResult::BufferFull => (),
+        };
+
+        let data = network.data();
+
+        match self.protocol.framing() {
+            Framing::Delimiter(d) => match find_delimiter(data, d) {
+                None => None,
+                Some(pos) => {
+                    let msg = Some(data[..pos].to_vec());
+                    network.reset(pos);
+                    msg
+                }
+            },
+            Framing::ExactBytes(_) => None,
+        }
+    }
+}
+
+fn find_delimiter(buf: &[u8], delimiter: &[u8]) -> Option<usize> {
+    let len = delimiter.len();
+    buf.windows(len)
+        .position(|w| w == delimiter)
+        .map(|i| i + len)
 }

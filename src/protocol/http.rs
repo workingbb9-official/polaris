@@ -1,32 +1,9 @@
 use super::*;
-use crate::network::{Network, RecvResult};
 
 pub struct HttpProtocol;
 impl Protocol for HttpProtocol {
-    async fn read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        match network.read().await {
-            RecvResult::NoData => {
-                info!("Received no data");
-                return None;
-            }
-            RecvResult::Timeout => {
-                info!("Connection timed out");
-                return None;
-            }
-            RecvResult::IoError => {
-                info!("IO error when reading");
-                return None;
-            }
-            RecvResult::BufferFull => (),
-        };
-
-        if let Some(pos) = find_delimiter(network.data()) {
-            let data = network.data()[..pos].to_vec();
-            network.reset(pos);
-            Some(data)
-        } else {
-            None
-        }
+    fn framing(&self) -> Framing {
+        Framing::Delimiter(b"\r\n\r\n")
     }
 
     fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
@@ -88,8 +65,4 @@ fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -
     final_response.extend(&body);
 
     final_response
-}
-
-fn find_delimiter(buf: &[u8]) -> Option<usize> {
-    buf.windows(4).position(|w| w == b"\r\n\r\n").map(|i| i + 4)
 }

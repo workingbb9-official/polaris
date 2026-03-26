@@ -4,68 +4,30 @@ use tokio::time::{Duration, timeout};
 
 pub struct Network {
     stream: TcpStream,
-    buf: SlidingBuffer,
+    buf: NetworkBuffer,
     config: NetworkConfig,
 }
 
 impl Network {
-    pub fn new(stream: TcpStream, buf: SlidingBuffer, config: NetworkConfig) -> Self {
+    pub fn new(stream: TcpStream, config: NetworkConfig) -> Self {
         Network {
             stream,
-            buf,
+            buf: NetworkBuffer::new(config.buf_size),
             config,
         }
     }
 
-    pub async fn read_until(&mut self, delimiter: &[u8]) -> Result<usize, RecvError> {
-        loop {
-            let space = self.buf.free_space();
-
-            if space.is_empty() {
-                return Err(RecvError::DelimiterNotFound);
-            }
-
-            let n = match timeout(
-                Duration::from_secs(self.config.timeout),
-                self.stream.read(space),
-            )
-            .await
-            {
-                Ok(Ok(0)) => return Ok(0),
-                Ok(Ok(n)) => n,
-                Ok(Err(_)) => return Err(RecvError::IoError),
-                Err(_) => return Ok(0),
-            };
-
-            self.buf.head += n;
-
-            if let Some(pos) = self.find_delimiter(delimiter) {
-                return Ok(pos);
-            }
-        }
-    }
-
-    /// Returns # of bytes read.
-    /// Could be less than 'bytes' if buffer is not large enough.
-    pub async fn read_exact(&mut self, bytes: usize) -> Result<usize, RecvError> {
-        let space = self.buf.free_space();
-
-        let n = if space.len() < bytes {
-            space.len()
-        } else {
-            bytes
-        };
-
+    pub async fn read(&mut self) -> RecvResult {
         match timeout(
             Duration::from_secs(self.config.timeout),
-            self.stream.read(&mut space[..n]),
-        ).await {
-            Ok(Ok(n)) => {
-                self.buf.head += n;
-                Ok(n)
-            }
-            Ok(Err(_)) => Err(RecvError::IoError),
-            Err(_) => Ok(0),
+            self.stream.read(&mut self.buf.storage),
+        )
+        .await
+        {
+            Ok(Ok(0)) => RecvResult::NoData,
+            Ok(Ok(_)) => RecvResult::BufferFull,
+            Err(_) => RecvResult::Timeout,
+            Ok(Err(_)) => RecvResult::IoError,
         }
     }
 
@@ -77,64 +39,44 @@ impl Network {
     }
 
     pub fn data(&self) -> &[u8] {
-        self.buf.data()
+        &self.buf.storage
     }
 
     pub fn reset(&mut self, pos: usize) {
-        self.buf.shift_leftovers(pos);
-    }
-
-    fn find_delimiter(&self, delimiter: &[u8]) -> Option<usize> {
-        let len = delimiter.len();
-        self.buf
-            .data()
-            .windows(len)
-            .position(|w| w == delimiter)
-            .map(|i| i + len)
+        self.buf.shift(pos);
     }
 }
 
-pub enum RecvError {
-    DelimiterNotFound,
+pub enum RecvResult {
+    BufferFull,
+    NoData,
+    Timeout,
     IoError,
 }
 
 pub struct NetworkConfig {
     timeout: u64,
+    buf_size: usize,
 }
 
 impl NetworkConfig {
-    pub fn new(timeout: u64) -> Self {
-        NetworkConfig { timeout }
+    pub fn new(timeout: u64, buf_size: usize) -> Self {
+        NetworkConfig { timeout, buf_size }
     }
 }
 
-pub struct SlidingBuffer {
+struct NetworkBuffer {
     storage: Vec<u8>,
-    head: usize,
 }
 
-impl SlidingBuffer {
-    pub fn new(size: usize) -> Self {
+impl NetworkBuffer {
+    fn new(size: usize) -> Self {
         Self {
             storage: vec![0u8; size],
-            head: 0,
         }
     }
 
-    pub fn data(&self) -> &[u8] {
-        &self.storage[..self.head]
-    }
-
-    pub fn free_space(&mut self) -> &mut [u8] {
-        &mut self.storage[self.head..]
-    }
-
-    pub fn shift_leftovers(&mut self, finished: usize) {
-        let leftover = self.head - finished;
-        if leftover > 0 {
-            self.storage.copy_within(finished..self.head, 0);
-        }
-        self.head = leftover;
+    fn shift(&mut self, pos: usize) {
+        self.storage.copy_within(pos.., 0);
     }
 }

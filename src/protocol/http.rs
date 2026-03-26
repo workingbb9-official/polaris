@@ -1,29 +1,32 @@
 use super::*;
-use crate::network::{Network, RecvError};
+use crate::network::{Network, RecvResult};
 
 pub struct HttpProtocol;
 impl Protocol for HttpProtocol {
     async fn read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        let pos = match network.read_until(b"\r\n\r\n").await {
-            Err(RecvError::DelimiterNotFound) => {
-                info!("HTTP header too large");
+        match network.read().await {
+            RecvResult::NoData => {
+                info!("Received no data");
                 return None;
             }
-            Err(RecvError::IoError) => {
+            RecvResult::Timeout => {
+                info!("Connection timed out");
+                return None;
+            }
+            RecvResult::IoError => {
                 info!("IO error when reading");
                 return None;
             }
-            Ok(0) => {
-                info!("No data received");
-                return None;
-            }
-            Ok(n) => n,
+            RecvResult::BufferFull => (),
         };
 
-        let data = network.data()[..pos].to_vec();
-        network.reset(pos);
-
-        Some(data)
+        if let Some(pos) = find_delimiter(network.data()) {
+            let data = network.data()[..pos].to_vec();
+            network.reset(pos);
+            Some(data)
+        } else {
+            None
+        }
     }
 
     fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
@@ -85,4 +88,8 @@ fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -
     final_response.extend(&body);
 
     final_response
+}
+
+fn find_delimiter(buf: &[u8]) -> Option<usize> {
+    buf.windows(4).position(|w| w == b"\r\n\r\n").map(|i| i + 4)
 }

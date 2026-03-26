@@ -71,7 +71,7 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
         })
     }
 
-    /// Connect to client and spawn a task.
+    /// Connect to clients and spawn a task.
     pub async fn run(self: Arc<Self>) -> tokio::io::Result<()> {
         loop {
             let (stream, _) = self.listener.accept().await?;
@@ -83,15 +83,10 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
         }
     }
 
-    /// Handle a connection task for a single client.
-    ///
-    /// Receive bytes, parse, handle, format and send response.
-    ///
     async fn handle_connection(&self, stream: TcpStream) {
         info!("Connected to client");
-        let buf = network::SlidingBuffer::new(BUF_SIZE);
-        let config = network::NetworkConfig::new(TIMEOUT_LEN);
-        let network = network::Network::new(stream, buf, config);
+        let config = network::NetworkConfig::new(TIMEOUT_LEN, BUF_SIZE);
+        let network = network::Network::new(stream, config);
 
         self.connection_loop(network).await;
         info!("Dropping connection");

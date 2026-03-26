@@ -31,8 +31,8 @@ impl Protocol for HttpProtocol {
             }
             ProtocolResponse::FileNotFound => serialize_http(
                 "HTTP/1.1 404 Not Found",
-                "keep-alive",
                 "text/plain",
+                "keep-alive",
                 b"Polaris\nFile Not Found".to_vec(),
             ),
             ProtocolResponse::BadRequest => serialize_http(

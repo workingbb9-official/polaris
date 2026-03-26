@@ -1,13 +1,16 @@
 use log::warn;
-use polaris::{HttpProtocol, ProtocolResponse, Router, Server};
-use std::fs;
+use polaris::{HttpProtocol, NetworkConfig, ProtocolResponse, Router, Server};
 use std::sync::Arc;
+use std::{fs, num::NonZero};
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
     let port = "127.0.0.1:8080";
+
+    let config = NetworkConfig::new(3, NonZero::new(1024).unwrap());
+
     let protocol = HttpProtocol;
 
     let mut router = Router::new();
@@ -17,7 +20,7 @@ async fn main() {
     router.add_route(b"/about", about_html);
     router.add_route(b"/about.js", about_js);
 
-    let server = Server::new(port, protocol, router)
+    let server = Server::new(port, config, protocol, router)
         .await
         .expect("Failed to create server");
 

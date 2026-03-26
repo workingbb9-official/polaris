@@ -11,10 +11,6 @@ use tokio::net::{TcpListener, TcpStream};
 
 type Handler = fn(&[u8]) -> ProtocolResponse;
 
-const BUF_SIZE: usize = 8192;
-const TIMEOUT_LEN: u64 = 5;
-
-/// Use to map a path to an action and response.
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
 }
@@ -56,17 +52,24 @@ impl Default for Router {
 
 pub struct Server<P: Protocol> {
     listener: TcpListener,
+    config: NetworkConfig,
     protocol: P,
     router: Router,
 }
 
 impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
-    pub async fn new(addr: &str, protocol: P, router: Router) -> tokio::io::Result<Self> {
+    pub async fn new(
+        addr: &str,
+        config: NetworkConfig,
+        protocol: P,
+        router: Router,
+    ) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
 
         Ok(Self {
             listener,
+            config,
             protocol,
             router,
         })
@@ -86,8 +89,7 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
 
     async fn handle_connection(&self, stream: TcpStream) {
         info!("Connected to client");
-        let config = NetworkConfig::new(TIMEOUT_LEN, BUF_SIZE);
-        let network = Network::new(stream, config);
+        let network = Network::new(stream, self.config);
 
         self.connection_loop(network).await;
         info!("Dropping connection");
@@ -118,21 +120,18 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
                 return None;
             }
             ReadResult::BufferFull => (),
+            ReadResult::Data => (),
         };
 
         let data = network.data();
 
-        match self.protocol.framing() {
-            Framing::Delimiter(d) => match find_delimiter(data, d) {
-                None => None,
-                Some(pos) => {
-                    let msg = Some(data[..pos].to_vec());
-                    network.reset(pos);
-                    msg
-                }
-            },
-            Framing::ExactBytes(_) => None,
-        }
+        let Framing::Delimiter(d) = self.protocol.framing() else {
+            return None;
+        };
+        let pos = find_delimiter(data, d)?;
+        let msg = data[..pos].to_vec();
+        network.reset(pos);
+        Some(msg)
     }
 }
 

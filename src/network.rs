@@ -22,7 +22,7 @@ impl Network {
     pub async fn read(&mut self) -> ReadResult {
         let n = match timeout(
             Duration::from_secs(self.config.timeout),
-            self.stream.read(&mut self.buf.storage),
+            self.stream.read(&mut self.buf.storage[self.buf.filled..]),
         )
         .await
         {

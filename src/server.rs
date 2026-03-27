@@ -106,32 +106,40 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     }
 
     async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        match network.read().await {
-            ReadResult::NoData => {
-                info!("Received no data");
-                return None;
-            }
-            ReadResult::Timeout => {
-                info!("Connection timed out");
-                return None;
-            }
-            ReadResult::IoError => {
-                warn!("IO error when reading");
-                return None;
-            }
-            ReadResult::BufferFull => (),
-            ReadResult::Data => (),
-        };
-
-        let data = network.data();
-
         let Framing::Delimiter(d) = self.protocol.framing() else {
             return None;
         };
-        let pos = find_delimiter(data, d)?;
-        let msg = data[..pos].to_vec();
-        network.reset(pos);
-        Some(msg)
+
+        loop {
+            match network.read().await {
+                ReadResult::NoData => {
+                    info!("Received no data");
+                    return None;
+                }
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    let pos = find_delimiter(network.data(), d)?;
+                    let msg = network.data()[..pos].to_vec();
+                    network.reset(pos);
+                    return Some(msg);
+                }
+
+                ReadResult::Data => {
+                    if let Some(pos) = find_delimiter(network.data(), d) {
+                        let msg = network.data()[..pos].to_vec();
+                        network.reset(pos);
+                        return Some(msg);
+                    };
+                }
+            };
+        }
     }
 }
 

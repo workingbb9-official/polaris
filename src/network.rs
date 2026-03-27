@@ -48,7 +48,7 @@ impl Network {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buf.storage
+        &self.buf.storage[..self.buf.filled]
     }
 
     pub fn reset(&mut self, pos: usize) {
@@ -90,7 +90,8 @@ impl NetworkBuffer {
     }
 
     fn shift(&mut self, pos: usize) {
+        assert!(pos <= self.filled, "pos exceeds filled bytes");
         self.storage.copy_within(pos.., 0);
-        self.filled = pos;
+        self.filled -= pos;
     }
 }

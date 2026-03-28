@@ -71,8 +71,11 @@ pub struct NetworkConfig {
 }
 
 impl NetworkConfig {
-    pub fn new(timeout: u64, buf_size: NonZeroUsize) -> Self {
-        NetworkConfig { timeout, buf_size }
+    pub fn new(timeout: u64, buf_size: usize) -> Self {
+        NetworkConfig {
+            timeout,
+            buf_size: NonZeroUsize::new(buf_size).expect("buf_size must be non-zero"),
+        }
     }
 }
 

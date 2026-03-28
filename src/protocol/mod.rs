@@ -1,12 +1,9 @@
 mod http;
-use crate::network::Network;
 pub use http::HttpProtocol;
-use log::info;
 
 #[trait_variant::make(Protocol: Send)]
 pub trait _P {
-    async fn read(&self, network: &mut Network) -> Option<Vec<u8>>;
-
+    fn framing(&self) -> Framing;
     fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest>;
     fn serialize(&self, response: ProtocolResponse) -> Vec<u8>;
 }
@@ -24,4 +21,9 @@ pub enum ProtocolResponse {
     FileFound { content_type: String, body: Vec<u8> },
     FileNotFound,
     BadRequest,
+}
+
+pub enum Framing {
+    Delimiter(&'static [u8]),
+    ExactBytes(usize),
 }

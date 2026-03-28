@@ -1,7 +1,8 @@
-use crate::network;
+use crate::network::{Network, NetworkConfig, ReadResult};
+use crate::protocol::Framing;
 use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
 
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -10,10 +11,6 @@ use tokio::net::{TcpListener, TcpStream};
 
 type Handler = fn(&[u8]) -> ProtocolResponse;
 
-const BUF_SIZE: usize = 8192;
-const TIMEOUT_LEN: u64 = 5;
-
-/// Use to map a path to an action and response.
 pub struct Router {
     routes: HashMap<Vec<u8>, Handler>,
 }
@@ -55,23 +52,30 @@ impl Default for Router {
 
 pub struct Server<P: Protocol> {
     listener: TcpListener,
+    config: NetworkConfig,
     protocol: P,
     router: Router,
 }
 
 impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
-    pub async fn new(addr: &str, protocol: P, router: Router) -> tokio::io::Result<Self> {
+    pub async fn new(
+        addr: &str,
+        config: NetworkConfig,
+        protocol: P,
+        router: Router,
+    ) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
 
         Ok(Self {
             listener,
+            config,
             protocol,
             router,
         })
     }
 
-    /// Connect to client and spawn a task.
+    /// Connect to clients and spawn a task.
     pub async fn run(self: Arc<Self>) -> tokio::io::Result<()> {
         loop {
             let (stream, _) = self.listener.accept().await?;
@@ -83,27 +87,65 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
         }
     }
 
-    /// Handle a connection task for a single client.
-    ///
-    /// Receive bytes, parse, handle, format and send response.
-    ///
     async fn handle_connection(&self, stream: TcpStream) {
         info!("Connected to client");
-        let buf = network::SlidingBuffer::new(BUF_SIZE);
-        let config = network::NetworkConfig::new(TIMEOUT_LEN);
-        let network = network::Network::new(stream, buf, config);
+        let network = Network::new(stream, self.config);
 
         self.connection_loop(network).await;
         info!("Dropping connection");
     }
 
-    async fn connection_loop(&self, mut network: network::Network) -> Option<()> {
+    async fn connection_loop(&self, mut network: Network) -> Option<()> {
         loop {
-            let raw = self.protocol.read(&mut network).await?;
+            let raw = self.net_read(&mut network).await?;
             let msg = self.protocol.parse(raw)?;
             let outcome = self.router.handle(msg);
             let response = self.protocol.serialize(outcome);
             network.write(&response).await.ok()?;
         }
     }
+
+    async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
+        let Framing::Delimiter(d) = self.protocol.framing() else {
+            return None;
+        };
+
+        loop {
+            match network.read().await {
+                ReadResult::NoData => {
+                    info!("Received no data");
+                    return None;
+                }
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    let pos = find_delimiter(network.data(), d)?;
+                    let msg = network.data()[..pos].to_vec();
+                    network.reset(pos);
+                    return Some(msg);
+                }
+
+                ReadResult::Data => {
+                    if let Some(pos) = find_delimiter(network.data(), d) {
+                        let msg = network.data()[..pos].to_vec();
+                        network.reset(pos);
+                        return Some(msg);
+                    };
+                }
+            };
+        }
+    }
+}
+
+fn find_delimiter(buf: &[u8], delimiter: &[u8]) -> Option<usize> {
+    let len = delimiter.len();
+    buf.windows(len)
+        .position(|w| w == delimiter)
+        .map(|i| i + len)
 }

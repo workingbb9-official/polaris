@@ -1,29 +1,9 @@
 use super::*;
-use crate::network::{Network, RecvError};
 
 pub struct HttpProtocol;
 impl Protocol for HttpProtocol {
-    async fn read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        let pos = match network.read_until(b"\r\n\r\n").await {
-            Err(RecvError::DelimiterNotFound) => {
-                info!("HTTP header too large");
-                return None;
-            }
-            Err(RecvError::IoError) => {
-                info!("IO error when reading");
-                return None;
-            }
-            Ok(0) => {
-                info!("No data received");
-                return None;
-            }
-            Ok(n) => n,
-        };
-
-        let data = network.data()[..pos].to_vec();
-        network.reset(pos);
-
-        Some(data)
+    fn framing(&self) -> Framing {
+        Framing::Delimiter(b"\r\n\r\n")
     }
 
     fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
@@ -51,8 +31,8 @@ impl Protocol for HttpProtocol {
             }
             ProtocolResponse::FileNotFound => serialize_http(
                 "HTTP/1.1 404 Not Found",
-                "keep-alive",
                 "text/plain",
+                "keep-alive",
                 b"Polaris\nFile Not Found".to_vec(),
             ),
             ProtocolResponse::BadRequest => serialize_http(

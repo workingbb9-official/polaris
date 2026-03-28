@@ -2,47 +2,42 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{Duration, timeout};
 
+use std::num::NonZeroUsize;
+
 pub struct Network {
     stream: TcpStream,
-    buf: SlidingBuffer,
+    buf: NetworkBuffer,
     config: NetworkConfig,
 }
 
 impl Network {
-    pub fn new(stream: TcpStream, buf: SlidingBuffer, config: NetworkConfig) -> Self {
+    pub fn new(stream: TcpStream, config: NetworkConfig) -> Self {
         Network {
             stream,
-            buf,
+            buf: NetworkBuffer::new(config.buf_size),
             config,
         }
     }
 
-    pub async fn read_until(&mut self, delimiter: &[u8]) -> Result<usize, RecvError> {
-        loop {
-            let capacity = self.buf.available_capacity();
-            if capacity == 0 {
-                return Err(RecvError::DelimiterNotFound);
-            }
+    pub async fn read(&mut self) -> ReadResult {
+        let n = match timeout(
+            Duration::from_secs(self.config.timeout),
+            self.stream.read(&mut self.buf.storage[self.buf.filled..]),
+        )
+        .await
+        {
+            Ok(Err(_)) => return ReadResult::IoError,
+            Err(_) => return ReadResult::Timeout,
+            Ok(Ok(0)) => return ReadResult::NoData,
+            Ok(Ok(n)) => n,
+        };
 
-            let space = self.buf.write_area();
-            let n = match timeout(
-                Duration::from_secs(self.config.timeout),
-                self.stream.read(space),
-            )
-            .await
-            {
-                Ok(Ok(0)) => return Ok(0),
-                Ok(Ok(n)) => n,
-                Ok(Err(_)) => return Err(RecvError::IoError),
-                Err(_) => return Ok(0),
-            };
-
-            self.buf.head += n;
-
-            if let Some(pos) = self.find_delimiter(delimiter) {
-                return Ok(pos);
-            }
+        if n == self.buf.storage.len() {
+            return ReadResult::BufferFull;
         }
+
+        self.buf.filled += n;
+        ReadResult::Data
     }
 
     pub async fn write(&mut self, buf: &[u8]) -> tokio::io::Result<()> {
@@ -53,70 +48,50 @@ impl Network {
     }
 
     pub fn data(&self) -> &[u8] {
-        self.buf.data()
+        &self.buf.storage[..self.buf.filled]
     }
 
     pub fn reset(&mut self, pos: usize) {
-        self.buf.shift_leftovers(pos);
-    }
-
-    fn find_delimiter(&self, delimiter: &[u8]) -> Option<usize> {
-        let len = delimiter.len();
-        self.buf
-            .data()
-            .windows(len)
-            .position(|w| w == delimiter)
-            .map(|i| i + len)
+        self.buf.shift(pos);
     }
 }
 
-pub enum RecvError {
-    DelimiterNotFound,
+pub enum ReadResult {
     IoError,
+    NoData,
+    Timeout,
+    BufferFull,
+    Data,
 }
 
+#[derive(Copy, Clone)]
 pub struct NetworkConfig {
     timeout: u64,
+    buf_size: NonZeroUsize,
 }
 
 impl NetworkConfig {
-    pub fn new(timeout: u64) -> Self {
-        NetworkConfig { timeout }
+    pub fn new(timeout: u64, buf_size: NonZeroUsize) -> Self {
+        NetworkConfig { timeout, buf_size }
     }
 }
 
-pub struct SlidingBuffer {
+struct NetworkBuffer {
     storage: Vec<u8>,
-    head: usize,
+    filled: usize,
 }
 
-impl SlidingBuffer {
-    pub fn new(size: usize) -> Self {
+impl NetworkBuffer {
+    fn new(size: NonZeroUsize) -> Self {
         Self {
-            storage: vec![0u8; size],
-            head: 0,
+            storage: vec![0u8; size.into()],
+            filled: 0,
         }
     }
 
-    pub fn data(&self) -> &[u8] {
-        &self.storage[..self.head]
-    }
-
-    pub fn available_capacity(&self) -> usize {
-        self.storage.len() - self.head
-    }
-
-    /// Return space open for writing.
-    pub fn write_area(&mut self) -> &mut [u8] {
-        &mut self.storage[self.head..]
-    }
-
-    /// Move leftover data to start of the buffer.
-    pub fn shift_leftovers(&mut self, finished: usize) {
-        let leftover = self.head - finished;
-        if leftover > 0 {
-            self.storage.copy_within(finished..self.head, 0);
-        }
-        self.head = leftover;
+    fn shift(&mut self, pos: usize) {
+        assert!(pos <= self.filled, "pos exceeds filled bytes");
+        self.storage.copy_within(pos.., 0);
+        self.filled -= pos;
     }
 }

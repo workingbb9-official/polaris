@@ -21,7 +21,7 @@ impl Network {
 
     pub async fn read(&mut self) -> ReadResult {
         let n = match timeout(
-            Duration::from_secs(self.config.timeout),
+            self.config.timeout,
             self.stream.read(&mut self.buf.storage[self.buf.filled..]),
         )
         .await
@@ -67,12 +67,12 @@ pub enum ReadResult {
 
 #[derive(Copy, Clone)]
 pub struct NetworkConfig {
-    timeout: u64,
+    timeout: Duration,
     buf_size: NonZeroUsize,
 }
 
 impl NetworkConfig {
-    pub fn new(timeout: u64, buf_size: usize) -> Self {
+    pub fn new(timeout: Duration, buf_size: usize) -> Self {
         NetworkConfig {
             timeout,
             buf_size: NonZeroUsize::new(buf_size).expect("buf_size must be non-zero"),

@@ -2,6 +2,7 @@ use log::warn;
 use polaris::{HttpProtocol, NetworkConfig, ProtocolResponse, Router, Server};
 use std::fs;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
@@ -9,7 +10,7 @@ async fn main() {
 
     let port = "127.0.0.1:8080";
 
-    let config = NetworkConfig::new(5, 8092);
+    let config = NetworkConfig::new(Duration::from_secs(5), 8092);
 
     let protocol = HttpProtocol;
 

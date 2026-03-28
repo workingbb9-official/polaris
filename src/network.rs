@@ -99,3 +99,38 @@ impl NetworkBuffer {
         self.filled -= pos;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shift_moves_bytes_forward() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(8).unwrap());
+        buf.storage.copy_from_slice(b"abcdefgh");
+        buf.filled = 8;
+
+        buf.shift(3);
+        assert_eq!(&buf.storage[..buf.filled], b"defgh");
+    }
+
+    #[test]
+    fn shift_zero_does_nothing() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(4).unwrap());
+        buf.storage.copy_from_slice(b"abcd");
+        buf.filled = 4;
+
+        buf.shift(0);
+        assert_eq!(&buf.storage[..buf.filled], b"abcd");
+    }
+
+    #[test]
+    #[should_panic]
+    fn shift_past_filled_panics() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(4).unwrap());
+        buf.storage.copy_from_slice(b"abcd");
+        buf.filled = 4;
+
+        buf.shift(5);
+    }
+}

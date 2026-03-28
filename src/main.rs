@@ -1,7 +1,7 @@
 use log::warn;
 use polaris::{HttpProtocol, NetworkConfig, ProtocolResponse, Router, Server};
-use std::sync::Arc;
 use std::fs;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {

@@ -32,7 +32,8 @@ impl Network {
             Ok(Ok(n)) => n,
         };
 
-        if n == self.buf.storage.len() {
+        if self.filled + n == self.buf.storage.len() {
+            self.filled += n;
             return ReadResult::BufferFull;
         }
 

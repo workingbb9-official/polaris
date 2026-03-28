@@ -156,37 +156,80 @@ mod tests {
     use super::*;
 
     #[test]
-    fn find_delimiter_in_middle() {
+    fn find_delimiter_in_middle_returns_index() {
         let buf: Vec<u8> = b"find$%_delimiter_inthis^&".to_vec();
         let result = find_delimiter(&buf, b"delimiter");
         assert_eq!(result, Some(16));
     }
 
     #[test]
-    fn find_delimiter_at_start() {
+    fn find_delimiter_at_start_returns_index() {
         let buf: Vec<u8> = b"delimiter@$_start".to_vec();
         let result = find_delimiter(&buf, b"delimiter");
         assert_eq!(result, Some(9));
     }
 
     #[test]
-    fn find_delimiter_at_end() {
+    fn find_delimiter_at_end_returns_index() {
         let buf: Vec<u8> = b"@TheEnd$is_thedelimiter".to_vec();
         let result = find_delimiter(&buf, b"delimiter");
         assert_eq!(result, Some(23));
     }
 
     #[test]
-    fn find_delimiter_not_found() {
+    fn find_delimiter_not_found_returns_none() {
         let buf: Vec<u8> = b"$oDelimInThis*ne".to_vec();
         let result = find_delimiter(&buf, b"delimiter");
         assert_eq!(result, None);
     }
 
     #[test]
-    fn find_delimiter_empty_buffer() {
+    fn find_delimiter_empty_buffer_returns_none() {
         let buf = Vec::new();
         let result = find_delimiter(&buf, b"delimiter");
         assert_eq!(result, None);
+    }
+
+    fn dummy_handler(_: &[u8]) -> ProtocolResponse {
+        ProtocolResponse::FileFound {
+            content_type: "text/plain".to_string(),
+            body: b"hello".to_vec(),
+        }
+    }
+
+    #[test]
+    fn router_valid_route_returns_found() {
+        let mut router = Router::new();
+        router.add_route(b"/", dummy_handler);
+
+        let request = ProtocolRequest::Http {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            body: Vec::new(),
+        };
+
+        let response = router.handle(request);
+        assert_eq!(
+            response,
+            ProtocolResponse::FileFound {
+                content_type: "text/plain".to_string(),
+                body: b"hello".to_vec(),
+            }
+        );
+    }
+
+    #[test]
+    fn router_invalid_route_returns_not_found() {
+        let mut router = Router::new();
+        router.add_route(b"/", dummy_handler);
+
+        let request = ProtocolRequest::Http {
+            method: "GET".to_string(),
+            path: "/fake".to_string(),
+            body: Vec::new(),
+        };
+
+        let response = router.handle(request);
+        assert_eq!(response, ProtocolResponse::FileNotFound);
     }
 }

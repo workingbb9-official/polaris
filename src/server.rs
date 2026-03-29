@@ -132,7 +132,8 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
                     return None;
                 }
                 ReadResult::BufferFull => {
-                    if let Some((vec, pos)) = self.handle_frame(network.data()) {
+                    if let Some((vec, pos)) = handle_frame(&self.protocol.framing(), network.data())
+                    {
                         network.reset(pos);
                         return Some(vec);
                     }
@@ -141,29 +142,13 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
                     return None;
                 }
                 ReadResult::Data => {
-                    if let Some((vec, pos)) = self.handle_frame(network.data()) {
+                    if let Some((vec, pos)) = handle_frame(&self.protocol.framing(), network.data())
+                    {
                         network.reset(pos);
                         return Some(vec);
                     }
                 }
             };
-        }
-    }
-
-    fn handle_frame(&self, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
-        match self.protocol.framing() {
-            Framing::Delimiter(d) => {
-                let idx = find_delimiter(buf, d)?;
-                let len = idx - d.len();
-                Some((buf[..len].to_vec(), idx))
-            }
-            Framing::ExactBytes(n) => {
-                if buf.len() < n {
-                    return None;
-                }
-
-                Some((buf[..n].to_vec(), n))
-            }
         }
     }
 }
@@ -174,6 +159,23 @@ fn find_delimiter(buf: &[u8], delimiter: &[u8]) -> Option<usize> {
     buf.windows(len)
         .position(|w| w == delimiter)
         .map(|i| i + len)
+}
+
+fn handle_frame(framing: &Framing, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
+    match framing {
+        Framing::Delimiter(d) => {
+            let idx = find_delimiter(buf, d)?;
+            let len = idx - d.len();
+            Some((buf[..len].to_vec(), idx))
+        }
+        Framing::ExactBytes(n) => {
+            if buf.len() < *n {
+                return None;
+            }
+
+            Some((buf[..*n].to_vec(), *n))
+        }
+    }
 }
 
 #[cfg(test)]

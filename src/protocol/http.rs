@@ -14,6 +14,7 @@ impl Protocol for HttpProtocol {
 
         let method = parts.next()?;
         let path = parts.next()?;
+        let _version = parts.next()?;
 
         let http_req = ProtocolRequest::Http {
             method: method.to_string(),
@@ -65,4 +66,99 @@ fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -
     final_response.extend(&body);
 
     final_response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_valid_get_request() {
+        let result = Protocol::parse(&HttpProtocol, b"GET /test HTTP/1.1\r\n".to_vec());
+        assert_eq!(
+            result,
+            Some(ProtocolRequest::Http {
+                method: "GET".to_string(),
+                path: "/test".to_string(),
+                body: Vec::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_valid_post_request() {
+        let result = Protocol::parse(&HttpProtocol, b"POST / HTTP/1.1\r\n".to_vec());
+        assert_eq!(
+            result,
+            Some(ProtocolRequest::Http {
+                method: "POST".to_string(),
+                path: "/".to_string(),
+                body: Vec::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_invalid_utf8_returns_none() {
+        let invalid = vec![0xFF, 0xFE, 0x00];
+        let result = Protocol::parse(&HttpProtocol, invalid);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn parse_missing_token_returns_none() {
+        let result = Protocol::parse(&HttpProtocol, b"GET HTTP/1.1\r\n".to_vec());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn serialize_file_found_returns_200() {
+        let response = ProtocolResponse::FileFound {
+            content_type: "text/plain".to_string(),
+            body: Vec::new(),
+        };
+
+        let result = Protocol::serialize(&HttpProtocol, response);
+        assert_eq!(
+            result,
+            b"HTTP/1.1 200 OK\r\n\
+            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
+            Content-Length: 0\r\n\
+            Content-Type: text/plain\r\n\
+            Connection: keep-alive\r\n\
+            \r\n",
+        );
+    }
+
+    #[test]
+    fn serialize_file_not_found_returns_404() {
+        let response = ProtocolResponse::FileNotFound;
+        let result = Protocol::serialize(&HttpProtocol, response);
+        assert_eq!(
+            result,
+            b"HTTP/1.1 404 Not Found\r\n\
+            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
+            Content-Length: 22\r\n\
+            Content-Type: text/plain\r\n\
+            Connection: keep-alive\r\n\
+            \r\n\
+            Polaris\nFile Not Found",
+        );
+    }
+
+    #[test]
+    fn serialize_bad_request_returns_400() {
+        let response = ProtocolResponse::BadRequest;
+        let result = Protocol::serialize(&HttpProtocol, response);
+        assert_eq!(
+            result,
+            b"HTTP/1.1 400 Bad Request\r\n\
+            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
+            Content-Length: 19\r\n\
+            Content-Type: text/plain\r\n\
+            Connection: close\r\n\
+            \r\n\
+            Polaris\nBad Request",
+        );
+    }
 }

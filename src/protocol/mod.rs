@@ -8,6 +8,7 @@ pub trait _P {
     fn serialize(&self, response: ProtocolResponse) -> Vec<u8>;
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ProtocolRequest {
     Http {
         method: String,
@@ -17,6 +18,7 @@ pub enum ProtocolRequest {
     Raw(Vec<u8>),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ProtocolResponse {
     FileFound { content_type: String, body: Vec<u8> },
     FileNotFound,

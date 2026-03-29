@@ -21,7 +21,7 @@ impl Network {
 
     pub async fn read(&mut self) -> ReadResult {
         let n = match timeout(
-            Duration::from_secs(self.config.timeout),
+            self.config.timeout,
             self.stream.read(&mut self.buf.storage[self.buf.filled..]),
         )
         .await
@@ -32,7 +32,8 @@ impl Network {
             Ok(Ok(n)) => n,
         };
 
-        if n == self.buf.storage.len() {
+        if self.buf.filled + n == self.buf.storage.len() {
+            self.buf.filled += n;
             return ReadResult::BufferFull;
         }
 
@@ -66,13 +67,16 @@ pub enum ReadResult {
 
 #[derive(Copy, Clone)]
 pub struct NetworkConfig {
-    timeout: u64,
+    timeout: Duration,
     buf_size: NonZeroUsize,
 }
 
 impl NetworkConfig {
-    pub fn new(timeout: u64, buf_size: NonZeroUsize) -> Self {
-        NetworkConfig { timeout, buf_size }
+    pub fn new(timeout: Duration, buf_size: usize) -> Self {
+        NetworkConfig {
+            timeout,
+            buf_size: NonZeroUsize::new(buf_size).expect("buf_size must be non-zero"),
+        }
     }
 }
 
@@ -93,5 +97,40 @@ impl NetworkBuffer {
         assert!(pos <= self.filled, "pos exceeds filled bytes");
         self.storage.copy_within(pos.., 0);
         self.filled -= pos;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shift_moves_bytes_forward() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(8).unwrap());
+        buf.storage.copy_from_slice(b"abcdefgh");
+        buf.filled = 8;
+
+        buf.shift(3);
+        assert_eq!(&buf.storage[..buf.filled], b"defgh");
+    }
+
+    #[test]
+    fn shift_zero_does_nothing() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(4).unwrap());
+        buf.storage.copy_from_slice(b"abcd");
+        buf.filled = 4;
+
+        buf.shift(0);
+        assert_eq!(&buf.storage[..buf.filled], b"abcd");
+    }
+
+    #[test]
+    #[should_panic]
+    fn shift_past_filled_panics() {
+        let mut buf = NetworkBuffer::new(NonZeroUsize::new(4).unwrap());
+        buf.storage.copy_from_slice(b"abcd");
+        buf.filled = 4;
+
+        buf.shift(5);
     }
 }

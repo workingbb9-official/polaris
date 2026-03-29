@@ -117,10 +117,6 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     }
 
     async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        let Framing::Delimiter(d) = self.protocol.framing() else {
-            return None;
-        };
-
         loop {
             match network.read().await {
                 ReadResult::NoData => {
@@ -136,20 +132,38 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
                     return None;
                 }
                 ReadResult::BufferFull => {
-                    let pos = find_delimiter(network.data(), d)?;
-                    let msg = network.data()[..pos].to_vec();
-                    network.reset(pos);
-                    return Some(msg);
-                }
-
-                ReadResult::Data => {
-                    if let Some(pos) = find_delimiter(network.data(), d) {
-                        let msg = network.data()[..pos].to_vec();
+                    if let Some((vec, pos)) = self.handle_frame(network.data()) {
                         network.reset(pos);
-                        return Some(msg);
-                    };
+                        return Some(vec);
+                    }
+
+                    info!("Buffer full, frame not found");
+                    return None;
+                }
+                ReadResult::Data => {
+                    if let Some((vec, pos)) = self.handle_frame(network.data()) {
+                        network.reset(pos);
+                        return Some(vec);
+                    }
                 }
             };
+        }
+    }
+
+    fn handle_frame(&self, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
+        match self.protocol.framing() {
+            Framing::Delimiter(d) => {
+                let idx = find_delimiter(buf, d)?;
+                let len = idx - d.len();
+                Some((buf[..len].to_vec(), idx))
+            }
+            Framing::ExactBytes(n) => {
+                if buf.len() < n {
+                    return None;
+                }
+
+                Some((buf[..n].to_vec(), n))
+            }
         }
     }
 }

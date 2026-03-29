@@ -1,12 +1,27 @@
 use super::*;
 
+pub struct HttpMessage {
+    method: String,
+    path: String,
+    body: Vec<u8>,
+}
+
+pub enum HttpResponse {
+    FileFound { content_type: String, body: Vec<u8> },
+    NotFound,
+    BadRequest,
+}
+
 pub struct HttpProtocol;
 impl Protocol for HttpProtocol {
+    type Message = HttpMessage;
+    type Response = HttpResponse;
+
     fn framing(&self) -> Framing {
         Framing::Delimiter(b"\r\n\r\n")
     }
 
-    fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest> {
+    fn parse(&self, raw: Vec<u8>) -> Option<HttpMessage> {
         let request = String::from_utf8(raw).ok()?;
 
         let first_line = request.lines().next()?;
@@ -16,7 +31,7 @@ impl Protocol for HttpProtocol {
         let path = parts.next()?;
         let _version = parts.next()?;
 
-        let http_req = ProtocolRequest::Http {
+        let http_req = HttpMessage {
             method: method.to_string(),
             path: path.to_string(),
             body: Vec::new(),
@@ -25,18 +40,22 @@ impl Protocol for HttpProtocol {
         Some(http_req)
     }
 
-    fn serialize(&self, response: ProtocolResponse) -> Vec<u8> {
+    fn route(&self, msg: HttpMessage) -> HttpResponse {
+        HttpResponse::NotFound
+    }
+
+    fn serialize(&self, response: HttpResponse) -> Vec<u8> {
         match response {
-            ProtocolResponse::FileFound { content_type, body } => {
+            HttpResponse::FileFound { content_type, body } => {
                 serialize_http("HTTP/1.1 200 OK", &content_type, "keep-alive", body)
             }
-            ProtocolResponse::FileNotFound => serialize_http(
+            HttpResponse::NotFound => serialize_http(
                 "HTTP/1.1 404 Not Found",
                 "text/plain",
                 "keep-alive",
                 b"Polaris\nFile Not Found".to_vec(),
             ),
-            ProtocolResponse::BadRequest => serialize_http(
+            HttpResponse::BadRequest => serialize_http(
                 "HTTP/1.1 400 Bad Request",
                 "text/plain",
                 "close",
@@ -77,7 +96,7 @@ mod tests {
         let result = Protocol::parse(&HttpProtocol, b"GET /test HTTP/1.1\r\n".to_vec());
         assert_eq!(
             result,
-            Some(ProtocolRequest::Http {
+            Some(HttpRequest {
                 method: "GET".to_string(),
                 path: "/test".to_string(),
                 body: Vec::new(),
@@ -90,7 +109,7 @@ mod tests {
         let result = Protocol::parse(&HttpProtocol, b"POST / HTTP/1.1\r\n".to_vec());
         assert_eq!(
             result,
-            Some(ProtocolRequest::Http {
+            Some(HttpRequest {
                 method: "POST".to_string(),
                 path: "/".to_string(),
                 body: Vec::new(),
@@ -113,7 +132,7 @@ mod tests {
 
     #[test]
     fn serialize_file_found_returns_200() {
-        let response = ProtocolResponse::FileFound {
+        let response = HttpResponse::FileFound {
             content_type: "text/plain".to_string(),
             body: Vec::new(),
         };
@@ -132,7 +151,7 @@ mod tests {
 
     #[test]
     fn serialize_file_not_found_returns_404() {
-        let response = ProtocolResponse::FileNotFound;
+        let response = HttpResponse::NotFound;
         let result = Protocol::serialize(&HttpProtocol, response);
         assert_eq!(
             result,
@@ -148,7 +167,7 @@ mod tests {
 
     #[test]
     fn serialize_bad_request_returns_400() {
-        let response = ProtocolResponse::BadRequest;
+        let response = HttpResponse::BadRequest;
         let result = Protocol::serialize(&HttpProtocol, response);
         assert_eq!(
             result,

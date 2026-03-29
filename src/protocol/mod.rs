@@ -3,9 +3,13 @@ pub use http::HttpProtocol;
 
 #[trait_variant::make(Protocol: Send)]
 pub trait _P {
+    type Message;
+    type Response;
+
     fn framing(&self) -> Framing;
-    fn parse(&self, raw: Vec<u8>) -> Option<ProtocolRequest>;
-    fn serialize(&self, response: ProtocolResponse) -> Vec<u8>;
+    fn parse(&self, raw: Vec<u8>) -> Option<Self::Message>;
+    fn route(&self, msg: Self::Message) -> Self::Response;
+    fn serialize(&self, response: Self::Response) -> Vec<u8>;
 }
 
 #[derive(Debug, PartialEq)]

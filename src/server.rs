@@ -1,69 +1,21 @@
 use crate::network::{Network, NetworkConfig, ReadResult};
 use crate::protocol::Framing;
-use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
+use crate::protocol::Protocol;
 
 use log::{info, warn};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 
-type Handler = fn(&[u8]) -> ProtocolResponse;
-
-pub struct Router {
-    routes: HashMap<Vec<u8>, Handler>,
-}
-
-impl Router {
-    pub fn new() -> Self {
-        Self {
-            routes: HashMap::new(),
-        }
-    }
-
-    pub fn add_route(&mut self, path: &[u8], handler: Handler) {
-        self.routes.insert(path.into(), handler);
-    }
-
-    /// Map a path to given handler.
-    pub fn handle(&self, msg: ProtocolRequest) -> ProtocolResponse {
-        match msg {
-            ProtocolRequest::Http { path, .. } => {
-                let raw = path.into_bytes();
-                match self.routes.get(&raw) {
-                    Some(handler) => handler(&raw),
-                    None => ProtocolResponse::FileNotFound,
-                }
-            }
-            ProtocolRequest::Raw(raw) => match self.routes.get(&raw) {
-                Some(handler) => handler(&raw),
-                None => ProtocolResponse::FileNotFound,
-            },
-        }
-    }
-}
-
-impl Default for Router {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub struct Server<P: Protocol> {
     listener: TcpListener,
     config: NetworkConfig,
     protocol: P,
-    router: Router,
 }
 
 impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
-    pub async fn new(
-        addr: &str,
-        config: NetworkConfig,
-        protocol: P,
-        router: Router,
-    ) -> tokio::io::Result<Self> {
+    pub async fn new(addr: &str, config: NetworkConfig, protocol: P) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
 
@@ -71,7 +23,6 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             listener,
             config,
             protocol,
-            router,
         })
     }
 
@@ -104,13 +55,9 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             let raw = self.net_read(&mut network).await?;
             let msg = match self.protocol.parse(raw) {
                 Some(msg) => msg,
-                None => {
-                    let bytes = self.protocol.serialize(ProtocolResponse::BadRequest);
-                    network.write(&bytes).await.ok()?;
-                    return None;
-                }
+                None => todo!(),
             };
-            let outcome = self.router.handle(msg);
+            let outcome = self.protocol.route(msg);
             let response = self.protocol.serialize(outcome);
             network.write(&response).await.ok()?;
         }
@@ -219,7 +166,7 @@ mod tests {
     }
 
     fn dummy_handler(_: &[u8]) -> ProtocolResponse {
-        ProtocolResponse::FileFound {
+        HttpResponse::FileFound {
             content_type: "text/plain".to_string(),
             body: b"hello".to_vec(),
         }
@@ -230,7 +177,7 @@ mod tests {
         let mut router = Router::new();
         router.add_route(b"/", dummy_handler);
 
-        let request = ProtocolRequest::Http {
+        let request = HttpMessage {
             method: "GET".to_string(),
             path: "/".to_string(),
             body: Vec::new(),
@@ -239,7 +186,7 @@ mod tests {
         let response = router.handle(request);
         assert_eq!(
             response,
-            ProtocolResponse::FileFound {
+            HttpResponse::FileFound {
                 content_type: "text/plain".to_string(),
                 body: b"hello".to_vec(),
             }

@@ -33,7 +33,7 @@ async fn main() {
 }
 
 fn home_html(_: &[u8]) -> ProtocolResponse {
-    let bytes = fs::read("static/index.html").unwrap();
+    let bytes = fs::read("examples/static/index.html").unwrap();
     ProtocolResponse::FileFound {
         content_type: "text/html".to_string(),
         body: bytes,
@@ -41,7 +41,7 @@ fn home_html(_: &[u8]) -> ProtocolResponse {
 }
 
 fn home_css(_: &[u8]) -> ProtocolResponse {
-    let bytes = fs::read("static/style.css").unwrap();
+    let bytes = fs::read("examples/static/style.css").unwrap();
     ProtocolResponse::FileFound {
         content_type: "text/css".to_string(),
         body: bytes,
@@ -49,7 +49,7 @@ fn home_css(_: &[u8]) -> ProtocolResponse {
 }
 
 fn home_js(_: &[u8]) -> ProtocolResponse {
-    let bytes = fs::read("static/script.js").unwrap();
+    let bytes = fs::read("examples/static/script.js").unwrap();
     ProtocolResponse::FileFound {
         content_type: "application/javascript".to_string(),
         body: bytes,
@@ -57,7 +57,7 @@ fn home_js(_: &[u8]) -> ProtocolResponse {
 }
 
 fn about_html(_: &[u8]) -> ProtocolResponse {
-    let bytes = fs::read("static/about.html").unwrap();
+    let bytes = fs::read("examples/static/about.html").unwrap();
     ProtocolResponse::FileFound {
         content_type: "text/html".to_string(),
         body: bytes,
@@ -65,7 +65,7 @@ fn about_html(_: &[u8]) -> ProtocolResponse {
 }
 
 fn about_js(_: &[u8]) -> ProtocolResponse {
-    let bytes = fs::read("static/about.js").unwrap();
+    let bytes = fs::read("examples/static/about.js").unwrap();
     ProtocolResponse::FileFound {
         content_type: "application/javascript".to_string(),
         body: bytes,

@@ -161,11 +161,12 @@ fn find_delimiter(buf: &[u8], delimiter: &[u8]) -> Option<usize> {
         .map(|i| i + len)
 }
 
+// Returns message and position where it ended.
 fn handle_frame(framing: &Framing, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
     match framing {
         Framing::Delimiter(d) => {
             let idx = find_delimiter(buf, d)?;
-            let len = idx - d.len();
+            let len = idx.saturating_sub(d.len());
             Some((buf[..len].to_vec(), idx))
         }
         Framing::ExactBytes(n) => {
@@ -212,7 +213,7 @@ mod tests {
 
     #[test]
     fn find_delimiter_empty_buffer_returns_none() {
-        let buf: &[u8] = b""; 
+        let buf: &[u8] = b"";
         let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
     }
@@ -258,5 +259,37 @@ mod tests {
 
         let response = router.handle(request);
         assert_eq!(response, ProtocolResponse::FileNotFound);
+    }
+
+    #[test]
+    fn delimiter_framing_returns_pos() {
+        let buf = b"HttpMessage\r\n\r\nMoreStuff";
+
+        let result = handle_frame(&Framing::Delimiter(b"\r\n\r\n"), buf);
+        assert_eq!(result, Some((buf[..11].to_vec(), 15)));
+    }
+
+    #[test]
+    fn delimiter_framing_no_delimiter() {
+        let buf = b"ThereIsNoDelimiter";
+
+        let result = handle_frame(&Framing::Delimiter(b"\r\n\r\n"), buf);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn exact_bytes_framing_returns_bytes() {
+        let buf = b"ThisIs17BytesLong";
+
+        let result = handle_frame(&Framing::ExactBytes(13), buf);
+        assert_eq!(result, Some((buf[..13].to_vec(), 13)));
+    }
+
+    #[test]
+    fn exact_bytes_framing_buffer_too_short() {
+        let buf = b"ShortString18Bytes";
+
+        let result = handle_frame(&Framing::ExactBytes(20), buf);
+        assert_eq!(result, None);
     }
 }

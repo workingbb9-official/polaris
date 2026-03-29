@@ -184,36 +184,36 @@ mod tests {
 
     #[test]
     fn find_delimiter_in_middle_returns_index() {
-        let buf: Vec<u8> = b"find$%_delimiter_inthis^&".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"find$%_delimiter_inthis^&";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(16));
     }
 
     #[test]
     fn find_delimiter_at_start_returns_index() {
-        let buf: Vec<u8> = b"delimiter@$_start".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"delimiter@$_start";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(9));
     }
 
     #[test]
     fn find_delimiter_at_end_returns_index() {
-        let buf: Vec<u8> = b"@TheEnd$is_thedelimiter".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"@TheEnd$is_thedelimiter";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(23));
     }
 
     #[test]
     fn find_delimiter_not_found_returns_none() {
-        let buf: Vec<u8> = b"$oDelimInThis*ne".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"$oDelimInThis*ne";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
     }
 
     #[test]
     fn find_delimiter_empty_buffer_returns_none() {
-        let buf = Vec::new();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b""; 
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
     }
 

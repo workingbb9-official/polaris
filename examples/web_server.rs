@@ -10,7 +10,7 @@ async fn main() {
 
     let port = "127.0.0.1:8080";
 
-    let config = NetworkConfig::new(Duration::from_secs(5), 8092);
+    let config = NetworkConfig::new(Duration::from_secs(5), 8192);
 
     let protocol = HttpProtocol;
 

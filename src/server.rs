@@ -117,10 +117,6 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     }
 
     async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
-        let Framing::Delimiter(d) = self.protocol.framing() else {
-            return None;
-        };
-
         loop {
             match network.read().await {
                 ReadResult::NoData => {
@@ -136,18 +132,21 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
                     return None;
                 }
                 ReadResult::BufferFull => {
-                    let pos = find_delimiter(network.data(), d)?;
-                    let msg = network.data()[..pos].to_vec();
-                    network.reset(pos);
-                    return Some(msg);
-                }
-
-                ReadResult::Data => {
-                    if let Some(pos) = find_delimiter(network.data(), d) {
-                        let msg = network.data()[..pos].to_vec();
+                    if let Some((vec, pos)) = handle_frame(&self.protocol.framing(), network.data())
+                    {
                         network.reset(pos);
-                        return Some(msg);
-                    };
+                        return Some(vec);
+                    }
+
+                    info!("Buffer full, frame not found");
+                    return None;
+                }
+                ReadResult::Data => {
+                    if let Some((vec, pos)) = handle_frame(&self.protocol.framing(), network.data())
+                    {
+                        network.reset(pos);
+                        return Some(vec);
+                    }
                 }
             };
         }
@@ -162,42 +161,60 @@ fn find_delimiter(buf: &[u8], delimiter: &[u8]) -> Option<usize> {
         .map(|i| i + len)
 }
 
+// Returns message and position where it ended.
+fn handle_frame(framing: &Framing, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
+    match framing {
+        Framing::Delimiter(d) => {
+            let idx = find_delimiter(buf, d)?;
+            let len = idx.saturating_sub(d.len());
+            Some((buf[..len].to_vec(), idx))
+        }
+        Framing::ExactBytes(n) => {
+            if buf.len() < *n {
+                return None;
+            }
+
+            Some((buf[..*n].to_vec(), *n))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn find_delimiter_in_middle_returns_index() {
-        let buf: Vec<u8> = b"find$%_delimiter_inthis^&".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"find$%_delimiter_inthis^&";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(16));
     }
 
     #[test]
     fn find_delimiter_at_start_returns_index() {
-        let buf: Vec<u8> = b"delimiter@$_start".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"delimiter@$_start";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(9));
     }
 
     #[test]
     fn find_delimiter_at_end_returns_index() {
-        let buf: Vec<u8> = b"@TheEnd$is_thedelimiter".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"@TheEnd$is_thedelimiter";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, Some(23));
     }
 
     #[test]
     fn find_delimiter_not_found_returns_none() {
-        let buf: Vec<u8> = b"$oDelimInThis*ne".to_vec();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"$oDelimInThis*ne";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
     }
 
     #[test]
     fn find_delimiter_empty_buffer_returns_none() {
-        let buf = Vec::new();
-        let result = find_delimiter(&buf, b"delimiter");
+        let buf: &[u8] = b"";
+        let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
     }
 
@@ -242,5 +259,37 @@ mod tests {
 
         let response = router.handle(request);
         assert_eq!(response, ProtocolResponse::FileNotFound);
+    }
+
+    #[test]
+    fn delimiter_framing_returns_pos() {
+        let buf = b"HttpMessage\r\n\r\nMoreStuff";
+
+        let result = handle_frame(&Framing::Delimiter(b"\r\n\r\n"), buf);
+        assert_eq!(result, Some((buf[..11].to_vec(), 15)));
+    }
+
+    #[test]
+    fn delimiter_framing_no_delimiter() {
+        let buf = b"ThereIsNoDelimiter";
+
+        let result = handle_frame(&Framing::Delimiter(b"\r\n\r\n"), buf);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn exact_bytes_framing_returns_bytes() {
+        let buf = b"ThisIs17BytesLong";
+
+        let result = handle_frame(&Framing::ExactBytes(13), buf);
+        assert_eq!(result, Some((buf[..13].to_vec(), 13)));
+    }
+
+    #[test]
+    fn exact_bytes_framing_buffer_too_short() {
+        let buf = b"ShortString18Bytes";
+
+        let result = handle_frame(&Framing::ExactBytes(20), buf);
+        assert_eq!(result, None);
     }
 }

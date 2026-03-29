@@ -87,6 +87,10 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
         }
     }
 
+    pub fn local_addr(&self) -> SocketAddr {
+        self.listener.local_addr().unwrap()
+    }
+
     async fn handle_connection(&self, stream: TcpStream) {
         info!("Connected to client");
         let network = Network::new(stream, self.config);
@@ -98,7 +102,14 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     async fn connection_loop(&self, mut network: Network) -> Option<()> {
         loop {
             let raw = self.net_read(&mut network).await?;
-            let msg = self.protocol.parse(raw)?;
+            let msg = match self.protocol.parse(raw) {
+                Some(msg) => msg,
+                None => {
+                    let bytes = self.protocol.serialize(ProtocolResponse::BadRequest);
+                    network.write(&bytes).await.ok()?;
+                    return None;
+                }
+            };
             let outcome = self.router.handle(msg);
             let response = self.protocol.serialize(outcome);
             network.write(&response).await.ok()?;

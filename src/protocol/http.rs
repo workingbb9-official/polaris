@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 pub struct HttpMessage {
     method: String,
@@ -12,7 +13,31 @@ pub enum HttpResponse {
     BadRequest,
 }
 
-pub struct HttpProtocol;
+type HttpHandler = fn(&[u8]) -> HttpResponse;
+
+pub struct HttpProtocol {
+    routes: HashMap<String, HttpHandler>,
+}
+
+impl HttpProtocol {
+    pub fn new() -> Self {
+        Self {
+            routes: HashMap::new(),
+        }
+    }
+
+    pub fn add_route(&mut self, method: &str, path: &str, handler: HttpHandler) {
+        let key = format!("{} {}", method, path);
+        self.routes.insert(key, handler);
+    }
+}
+
+impl Default for HttpProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Protocol for HttpProtocol {
     type Message = HttpMessage;
     type Response = HttpResponse;
@@ -41,6 +66,12 @@ impl Protocol for HttpProtocol {
     }
 
     fn route(&self, msg: HttpMessage) -> HttpResponse {
+        let key = format!("{} {}", msg.method, msg.path);
+
+        if let Some(handler) = self.routes.get(&key) {
+            return handler(&msg.body[..]);
+        }
+
         HttpResponse::NotFound
     }
 

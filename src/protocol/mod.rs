@@ -2,6 +2,7 @@ mod http;
 pub use http::HttpMessage;
 pub use http::HttpProtocol;
 pub use http::HttpResponse;
+pub use http::{Connection, ContentType, Status};
 
 #[trait_variant::make(Protocol: Send)]
 pub trait _P {
@@ -17,4 +18,5 @@ pub trait _P {
 pub enum Framing {
     Delimiter(&'static [u8]),
     ExactBytes(usize),
+    Http,
 }

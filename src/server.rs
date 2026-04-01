@@ -64,6 +64,10 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
     }
 
     async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
+        if let Framing::Http = self.protocol.framing() {
+            return self.net_read_http(network).await;
+        }
+
         loop {
             match network.read().await {
                 ReadResult::NoData => {
@@ -98,6 +102,65 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             };
         }
     }
+
+    async fn net_read_http(&self, network: &mut Network) -> Option<Vec<u8>> {
+        loop {
+            match network.read().await {
+                ReadResult::NoData => {
+                    info!("Received no data");
+                    return None;
+                }
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    if find_delimiter(network.data(), b"\r\n\r\n").is_some() {
+                        break;
+                    }
+
+                    info!("Buffer full, frame not found");
+                    return None;
+                }
+                ReadResult::Data => {
+                    if find_delimiter(network.data(), b"\r\n\r\n").is_some() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let content_len = extract_content_length(network.data());
+        let header_end = find_delimiter(network.data(), b"\r\n\r\n")?;
+        let total = header_end + content_len;
+
+        while network.data().len() < total {
+            match network.read().await {
+                ReadResult::NoData => return None,
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    info!("Buffer full, body not complete");
+                    return None;
+                }
+                ReadResult::Data => (),
+            }
+        }
+
+        let msg = network.data()[..total].to_vec();
+        network.reset(total);
+        Some(msg)
+    }
 }
 
 // Returns index directly after delimiter.
@@ -123,7 +186,28 @@ fn handle_frame(framing: &Framing, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
 
             Some((buf[..*n].to_vec(), *n))
         }
+        Framing::Http => {
+            warn!("handle_frame() used for Http");
+            None
+        }
     }
+}
+
+fn extract_content_length(headers: &[u8]) -> usize {
+    let key = b"Content-Length: ";
+    let pos = match headers.windows(key.len()).position(|w| w == key) {
+        Some(p) => p,
+        None => return 0,
+    };
+    let start = pos + key.len();
+    let end = match headers[start..].iter().position(|&b| b == b'\r') {
+        Some(e) => e + start,
+        None => return 0,
+    };
+    std::str::from_utf8(&headers[start..end])
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

@@ -7,10 +7,60 @@ pub struct HttpMessage {
     body: Vec<u8>,
 }
 
-pub enum HttpResponse {
-    FileFound { content_type: String, body: Vec<u8> },
+pub struct HttpResponse {
+    pub status: Status,
+    pub connection: Connection,
+    pub body: Option<(ContentType, Vec<u8>)>,
+}
+
+pub enum Status {
+    OK,
+    NoContent,
     NotFound,
     BadRequest,
+}
+
+impl Status {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Status::OK => "200 OK",
+            Status::NoContent => "204 No Content",
+            Status::NotFound => "404 Not Found",
+            Status::BadRequest => "400 Bad Request",
+        }
+    }
+}
+
+pub enum Connection {
+    KeepAlive,
+    Close,
+}
+
+impl Connection {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Connection::KeepAlive => "keep-alive",
+            Connection::Close => "close",
+        }
+    }
+}
+
+pub enum ContentType {
+    Plain,
+    Html,
+    Css,
+    JavaScript,
+}
+
+impl ContentType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ContentType::Plain => "text/plain",
+            ContentType::Html => "text/html",
+            ContentType::Css => "text/css",
+            ContentType::JavaScript => "text/javascript",
+        }
+    }
 }
 
 type HttpHandler = fn(&[u8]) -> HttpResponse;
@@ -43,23 +93,29 @@ impl Protocol for HttpProtocol {
     type Response = HttpResponse;
 
     fn framing(&self) -> Framing {
-        Framing::Delimiter(b"\r\n\r\n")
+        Framing::Http
     }
 
     fn parse(&self, raw: Vec<u8>) -> Option<HttpMessage> {
         let request = String::from_utf8(raw).ok()?;
+        let mut parts = request.splitn(2, "\r\n\r\n");
+        let headers = parts.next()?;
 
-        let first_line = request.lines().next()?;
-        let mut parts = first_line.split_whitespace();
+        let value = url_decode(parts.next().unwrap_or(""));
+        let body_str = value.splitn(2, '=').nth(1).unwrap_or(&value);
+        let body = body_str.as_bytes().to_vec();
 
-        let method = parts.next()?;
-        let path = parts.next()?;
-        let _version = parts.next()?;
+        let first_line = headers.lines().next()?;
+        let mut tokens = first_line.split_whitespace();
+
+        let method = tokens.next()?;
+        let path = tokens.next()?;
+        let _version = tokens.next()?;
 
         let http_req = HttpMessage {
             method: method.to_string(),
             path: path.to_string(),
-            body: Vec::new(),
+            body,
         };
 
         Some(http_req)
@@ -72,33 +128,29 @@ impl Protocol for HttpProtocol {
             return handler(&msg.body[..]);
         }
 
-        HttpResponse::NotFound
+        HttpResponse {
+            status: Status::NotFound,
+            connection: Connection::KeepAlive,
+            body: Some((ContentType::Plain, b"Polaris\nNotFound".to_vec())),
+        }
     }
 
     fn serialize(&self, response: HttpResponse) -> Vec<u8> {
-        match response {
-            HttpResponse::FileFound { content_type, body } => {
-                serialize_http("HTTP/1.1 200 OK", &content_type, "keep-alive", body)
-            }
-            HttpResponse::NotFound => serialize_http(
-                "HTTP/1.1 404 Not Found",
-                "text/plain",
-                "keep-alive",
-                b"Polaris\nFile Not Found".to_vec(),
-            ),
-            HttpResponse::BadRequest => serialize_http(
-                "HTTP/1.1 400 Bad Request",
-                "text/plain",
-                "close",
-                b"Polaris\nBad Request".to_vec(),
-            ),
-        }
+        let status_str = response.status.as_str();
+        let conn_str = response.connection.as_str();
+
+        let (content_str, body) = match response.body {
+            Some((ct, body)) => (ct.as_str(), body),
+            None => ("", Vec::new()),
+        };
+
+        build_response(status_str, conn_str, content_str, body)
     }
 }
 
-fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -> Vec<u8> {
+fn build_response(status: &str, conn: &str, content_type: &str, body: Vec<u8>) -> Vec<u8> {
     let header = format!(
-        "{}\r\n\
+        "HTTP/1.1 {}\r\n\
             Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
             Content-Length: {}\r\n\
             Content-Type: {}\r\n\
@@ -116,6 +168,26 @@ fn serialize_http(status: &str, content_type: &str, conn: &str, body: Vec<u8>) -
     final_response.extend(&body);
 
     final_response
+}
+
+fn url_decode(input: &str) -> String {
+    let mut result = String::new();
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '+' => result.push(' '),
+            '%' => {
+                let h1 = chars.next().unwrap_or('0');
+                let h2 = chars.next().unwrap_or('0');
+                if let Ok(byte) = u8::from_str_radix(&format!("{h1}{h2}"), 16) {
+                    result.push(byte as char);
+                }
+            }
+            _ => result.push(c),
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

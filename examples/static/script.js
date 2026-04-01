@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const statusSpan = document.querySelector('#status span');
     const testBtn = document.getElementById('testBtn');
+    const sendBtn = document.getElementById('sendBtn');
 
     // 1. Immediate feedback that JS loaded
     statusSpan.textContent = "Active";
@@ -20,5 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             window.location.href = '/about';
         }, 500); 
+    });
+
+    sendBtn.addEventListener('click', () => {
+        window.location.href = '/post';
     });
 });

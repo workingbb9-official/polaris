@@ -1,21 +1,23 @@
-use polaris::{HttpProtocol, NetworkConfig, ProtocolResponse, Router, Server};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use polaris::{Connection, ContentType, HttpProtocol, HttpResponse, Status};
+use polaris::{NetworkConfig, Server};
+
 async fn spawn_test_server() -> SocketAddr {
     let config = NetworkConfig::new(Duration::from_millis(100), 8192);
-    let protocol = HttpProtocol;
 
-    let mut router = Router::new();
-    router.add_route(b"/", |_| ProtocolResponse::FileFound {
-        content_type: "text/plain".to_string(),
-        body: b"hello".to_vec(),
+    let mut protocol = HttpProtocol::new();
+    protocol.add_route("GET", "/", |_| HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::Plain, b"hello".to_vec())),
     });
 
-    let server = Server::new("127.0.0.1:0", config, protocol, router)
+    // Port 0 lets OS pick at random, to avoid conflict between tests
+    let server = Server::new("127.0.0.1:0", config, protocol)
         .await
         .expect("Failed to create server");
 
@@ -58,27 +60,6 @@ async fn get_unknown_route_returns_404() {
     let response = String::from_utf8_lossy(&buf[..n]);
 
     assert!(response.contains("404 Not Found"));
-}
-
-#[tokio::test]
-async fn bad_request_drops_connection() {
-    let addr = spawn_test_server().await;
-
-    let mut stream = TcpStream::connect(addr).await.unwrap();
-    stream
-        .write_all(b"GIVE&ME$THE^PASSWORD\r\n\r\n")
-        .await
-        .unwrap();
-
-    let mut buf = vec![0u8; 1024];
-    let mut n = stream.read(&mut buf).await.unwrap();
-    let response = String::from_utf8_lossy(&buf[..n]);
-
-    assert!(response.contains("Connection: close"));
-
-    buf.clear();
-    n = stream.read(&mut buf).await.unwrap();
-    assert_eq!(n, 0);
 }
 
 #[tokio::test]

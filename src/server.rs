@@ -249,49 +249,6 @@ mod tests {
         assert_eq!(result, None);
     }
 
-    fn dummy_handler(_: &[u8]) -> ProtocolResponse {
-        HttpResponse::FileFound {
-            content_type: "text/plain".to_string(),
-            body: b"hello".to_vec(),
-        }
-    }
-
-    #[test]
-    fn router_valid_route_returns_found() {
-        let mut router = Router::new();
-        router.add_route(b"/", dummy_handler);
-
-        let request = HttpMessage {
-            method: "GET".to_string(),
-            path: "/".to_string(),
-            body: Vec::new(),
-        };
-
-        let response = router.handle(request);
-        assert_eq!(
-            response,
-            HttpResponse::FileFound {
-                content_type: "text/plain".to_string(),
-                body: b"hello".to_vec(),
-            }
-        );
-    }
-
-    #[test]
-    fn router_invalid_route_returns_not_found() {
-        let mut router = Router::new();
-        router.add_route(b"/", dummy_handler);
-
-        let request = ProtocolRequest::Http {
-            method: "GET".to_string(),
-            path: "/fake".to_string(),
-            body: Vec::new(),
-        };
-
-        let response = router.handle(request);
-        assert_eq!(response, ProtocolResponse::FileNotFound);
-    }
-
     #[test]
     fn delimiter_framing_returns_pos() {
         let buf = b"HttpMessage\r\n\r\nMoreStuff";

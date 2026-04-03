@@ -4,8 +4,7 @@ pub use http::HttpProtocol;
 pub use http::HttpResponse;
 pub use http::{Connection, ContentType, Status};
 
-#[trait_variant::make(Protocol: Send)]
-pub trait _P {
+pub trait Protocol: Send {
     type Message;
     type Response;
 

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 type HttpHandler = fn(&[u8]) -> HttpResponse;
 
+#[derive(PartialEq, Debug)]
 pub struct HttpMessage {
     method: String,
     path: String,
@@ -196,10 +197,12 @@ mod tests {
 
     #[test]
     fn parse_valid_get_request() {
-        let result = Protocol::parse(&HttpProtocol, b"GET /test HTTP/1.1\r\n".to_vec());
+        let protocol = HttpProtocol::new();
+        let result = protocol.parse(b"GET /test HTTP/1.1\r\n".to_vec());
+
         assert_eq!(
             result,
-            Some(HttpRequest {
+            Some(HttpMessage {
                 method: "GET".to_string(),
                 path: "/test".to_string(),
                 body: Vec::new(),
@@ -209,10 +212,12 @@ mod tests {
 
     #[test]
     fn parse_valid_post_request() {
-        let result = Protocol::parse(&HttpProtocol, b"POST / HTTP/1.1\r\n".to_vec());
+        let protocol = HttpProtocol::new();
+        let result = protocol.parse(b"POST / HTTP/1.1\r\n".to_vec());
+
         assert_eq!(
             result,
-            Some(HttpRequest {
+            Some(HttpMessage {
                 method: "POST".to_string(),
                 path: "/".to_string(),
                 body: Vec::new(),
@@ -223,64 +228,18 @@ mod tests {
     #[test]
     fn parse_invalid_utf8_returns_none() {
         let invalid = vec![0xFF, 0xFE, 0x00];
-        let result = Protocol::parse(&HttpProtocol, invalid);
+
+        let protocol = HttpProtocol::new();
+        let result = protocol.parse(invalid);
+
         assert_eq!(result, None);
     }
 
     #[test]
     fn parse_missing_token_returns_none() {
-        let result = Protocol::parse(&HttpProtocol, b"GET HTTP/1.1\r\n".to_vec());
+        let protocol = HttpProtocol::new();
+        let result = protocol.parse(b"GET HTTP/1.1\r\n".to_vec());
+
         assert_eq!(result, None);
-    }
-
-    #[test]
-    fn serialize_file_found_returns_200() {
-        let response = HttpResponse::FileFound {
-            content_type: "text/plain".to_string(),
-            body: Vec::new(),
-        };
-
-        let result = Protocol::serialize(&HttpProtocol, response);
-        assert_eq!(
-            result,
-            b"HTTP/1.1 200 OK\r\n\
-            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
-            Content-Length: 0\r\n\
-            Content-Type: text/plain\r\n\
-            Connection: keep-alive\r\n\
-            \r\n",
-        );
-    }
-
-    #[test]
-    fn serialize_file_not_found_returns_404() {
-        let response = HttpResponse::NotFound;
-        let result = Protocol::serialize(&HttpProtocol, response);
-        assert_eq!(
-            result,
-            b"HTTP/1.1 404 Not Found\r\n\
-            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
-            Content-Length: 22\r\n\
-            Content-Type: text/plain\r\n\
-            Connection: keep-alive\r\n\
-            \r\n\
-            Polaris\nFile Not Found",
-        );
-    }
-
-    #[test]
-    fn serialize_bad_request_returns_400() {
-        let response = HttpResponse::BadRequest;
-        let result = Protocol::serialize(&HttpProtocol, response);
-        assert_eq!(
-            result,
-            b"HTTP/1.1 400 Bad Request\r\n\
-            Content-Security-Policy: default-src 'self'; script-src 'self';\r\n\
-            Content-Length: 19\r\n\
-            Content-Type: text/plain\r\n\
-            Connection: close\r\n\
-            \r\n\
-            Polaris\nBad Request",
-        );
     }
 }

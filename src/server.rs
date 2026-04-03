@@ -1,69 +1,21 @@
-use crate::network::{Network, NetworkConfig, ReadResult};
-use crate::protocol::Framing;
-use crate::protocol::{Protocol, ProtocolRequest, ProtocolResponse};
-
 use log::{info, warn};
-use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
-use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 
-type Handler = fn(&[u8]) -> ProtocolResponse;
-
-pub struct Router {
-    routes: HashMap<Vec<u8>, Handler>,
-}
-
-impl Router {
-    pub fn new() -> Self {
-        Self {
-            routes: HashMap::new(),
-        }
-    }
-
-    pub fn add_route(&mut self, path: &[u8], handler: Handler) {
-        self.routes.insert(path.into(), handler);
-    }
-
-    /// Map a path to given handler.
-    pub fn handle(&self, msg: ProtocolRequest) -> ProtocolResponse {
-        match msg {
-            ProtocolRequest::Http { path, .. } => {
-                let raw = path.into_bytes();
-                match self.routes.get(&raw) {
-                    Some(handler) => handler(&raw),
-                    None => ProtocolResponse::FileNotFound,
-                }
-            }
-            ProtocolRequest::Raw(raw) => match self.routes.get(&raw) {
-                Some(handler) => handler(&raw),
-                None => ProtocolResponse::FileNotFound,
-            },
-        }
-    }
-}
-
-impl Default for Router {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use crate::network::{Network, NetworkConfig, ReadResult};
+use crate::protocol::Framing;
+use crate::protocol::Protocol;
 
 pub struct Server<P: Protocol> {
     listener: TcpListener,
     config: NetworkConfig,
     protocol: P,
-    router: Router,
 }
 
 impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
-    pub async fn new(
-        addr: &str,
-        config: NetworkConfig,
-        protocol: P,
-        router: Router,
-    ) -> tokio::io::Result<Self> {
+    pub async fn new(addr: &str, config: NetworkConfig, protocol: P) -> tokio::io::Result<Self> {
         let sock: SocketAddr = addr.parse().expect("Invalid address");
         let listener = TcpListener::bind(sock).await?;
 
@@ -71,7 +23,6 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             listener,
             config,
             protocol,
-            router,
         })
     }
 
@@ -104,19 +55,19 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             let raw = self.net_read(&mut network).await?;
             let msg = match self.protocol.parse(raw) {
                 Some(msg) => msg,
-                None => {
-                    let bytes = self.protocol.serialize(ProtocolResponse::BadRequest);
-                    network.write(&bytes).await.ok()?;
-                    return None;
-                }
+                None => todo!(),
             };
-            let outcome = self.router.handle(msg);
+            let outcome = self.protocol.route(msg);
             let response = self.protocol.serialize(outcome);
             network.write(&response).await.ok()?;
         }
     }
 
     async fn net_read(&self, network: &mut Network) -> Option<Vec<u8>> {
+        if let Framing::Http = self.protocol.framing() {
+            return self.net_read_http(network).await;
+        }
+
         loop {
             match network.read().await {
                 ReadResult::NoData => {
@@ -151,6 +102,65 @@ impl<P: Protocol + std::marker::Sync + 'static> Server<P> {
             };
         }
     }
+
+    async fn net_read_http(&self, network: &mut Network) -> Option<Vec<u8>> {
+        loop {
+            match network.read().await {
+                ReadResult::NoData => {
+                    info!("Received no data");
+                    return None;
+                }
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    if find_delimiter(network.data(), b"\r\n\r\n").is_some() {
+                        break;
+                    }
+
+                    info!("Buffer full, frame not found");
+                    return None;
+                }
+                ReadResult::Data => {
+                    if find_delimiter(network.data(), b"\r\n\r\n").is_some() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let content_len = extract_content_length(network.data());
+        let header_end = find_delimiter(network.data(), b"\r\n\r\n")?;
+        let total = header_end + content_len;
+
+        while network.data().len() < total {
+            match network.read().await {
+                ReadResult::NoData => return None,
+                ReadResult::Timeout => {
+                    info!("Connection timed out");
+                    return None;
+                }
+                ReadResult::IoError => {
+                    warn!("IO error when reading");
+                    return None;
+                }
+                ReadResult::BufferFull => {
+                    info!("Buffer full, body not complete");
+                    return None;
+                }
+                ReadResult::Data => (),
+            }
+        }
+
+        let msg = network.data()[..total].to_vec();
+        network.reset(total);
+        Some(msg)
+    }
 }
 
 // Returns index directly after delimiter.
@@ -176,7 +186,28 @@ fn handle_frame(framing: &Framing, buf: &[u8]) -> Option<(Vec<u8>, usize)> {
 
             Some((buf[..*n].to_vec(), *n))
         }
+        Framing::Http => {
+            warn!("handle_frame() used for Http");
+            None
+        }
     }
+}
+
+fn extract_content_length(headers: &[u8]) -> usize {
+    let key = b"Content-Length: ";
+    let pos = match headers.windows(key.len()).position(|w| w == key) {
+        Some(p) => p,
+        None => return 0,
+    };
+    let start = pos + key.len();
+    let end = match headers[start..].iter().position(|&b| b == b'\r') {
+        Some(e) => e + start,
+        None => return 0,
+    };
+    std::str::from_utf8(&headers[start..end])
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -216,49 +247,6 @@ mod tests {
         let buf: &[u8] = b"";
         let result = find_delimiter(buf, b"delimiter");
         assert_eq!(result, None);
-    }
-
-    fn dummy_handler(_: &[u8]) -> ProtocolResponse {
-        ProtocolResponse::FileFound {
-            content_type: "text/plain".to_string(),
-            body: b"hello".to_vec(),
-        }
-    }
-
-    #[test]
-    fn router_valid_route_returns_found() {
-        let mut router = Router::new();
-        router.add_route(b"/", dummy_handler);
-
-        let request = ProtocolRequest::Http {
-            method: "GET".to_string(),
-            path: "/".to_string(),
-            body: Vec::new(),
-        };
-
-        let response = router.handle(request);
-        assert_eq!(
-            response,
-            ProtocolResponse::FileFound {
-                content_type: "text/plain".to_string(),
-                body: b"hello".to_vec(),
-            }
-        );
-    }
-
-    #[test]
-    fn router_invalid_route_returns_not_found() {
-        let mut router = Router::new();
-        router.add_route(b"/", dummy_handler);
-
-        let request = ProtocolRequest::Http {
-            method: "GET".to_string(),
-            path: "/fake".to_string(),
-            body: Vec::new(),
-        };
-
-        let response = router.handle(request);
-        assert_eq!(response, ProtocolResponse::FileNotFound);
     }
 
     #[test]

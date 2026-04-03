@@ -1,8 +1,8 @@
 use log::warn;
-use polaris::{HttpProtocol, NetworkConfig, ProtocolResponse, Router, Server};
-use std::fs;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{fs, sync::Arc, time::Duration};
+
+use polaris::{Connection, ContentType, HttpProtocol, HttpResponse, Status};
+use polaris::{NetworkConfig, Server};
 
 #[tokio::main]
 async fn main() {
@@ -12,16 +12,16 @@ async fn main() {
 
     let config = NetworkConfig::new(Duration::from_secs(5), 8192);
 
-    let protocol = HttpProtocol;
+    let mut protocol = HttpProtocol::new();
+    protocol.add_route("GET", "/", home_html);
+    protocol.add_route("GET", "/style.css", home_css);
+    protocol.add_route("GET", "/script.js", home_js);
+    protocol.add_route("GET", "/about", about_html);
+    protocol.add_route("GET", "/about.js", about_js);
+    protocol.add_route("GET", "/post", post_html);
+    protocol.add_route("POST", "/post", display_post);
 
-    let mut router = Router::new();
-    router.add_route(b"/", home_html);
-    router.add_route(b"/style.css", home_css);
-    router.add_route(b"/script.js", home_js);
-    router.add_route(b"/about", about_html);
-    router.add_route(b"/about.js", about_js);
-
-    let server = Server::new(port, config, protocol, router)
+    let server = Server::new(port, config, protocol)
         .await
         .expect("Failed to create server");
 
@@ -32,42 +32,70 @@ async fn main() {
     }
 }
 
-fn home_html(_: &[u8]) -> ProtocolResponse {
+fn home_html(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("examples/static/index.html").unwrap();
-    ProtocolResponse::FileFound {
-        content_type: "text/html".to_string(),
-        body: bytes,
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::Html, bytes)),
     }
 }
 
-fn home_css(_: &[u8]) -> ProtocolResponse {
+fn home_css(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("examples/static/style.css").unwrap();
-    ProtocolResponse::FileFound {
-        content_type: "text/css".to_string(),
-        body: bytes,
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::Css, bytes)),
     }
 }
 
-fn home_js(_: &[u8]) -> ProtocolResponse {
+fn home_js(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("examples/static/script.js").unwrap();
-    ProtocolResponse::FileFound {
-        content_type: "application/javascript".to_string(),
-        body: bytes,
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::JavaScript, bytes)),
     }
 }
 
-fn about_html(_: &[u8]) -> ProtocolResponse {
+fn about_html(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("examples/static/about.html").unwrap();
-    ProtocolResponse::FileFound {
-        content_type: "text/html".to_string(),
-        body: bytes,
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::Html, bytes)),
     }
 }
 
-fn about_js(_: &[u8]) -> ProtocolResponse {
+fn about_js(_: &[u8]) -> HttpResponse {
     let bytes = fs::read("examples/static/about.js").unwrap();
-    ProtocolResponse::FileFound {
-        content_type: "application/javascript".to_string(),
-        body: bytes,
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::JavaScript, bytes)),
+    }
+}
+
+fn post_html(_: &[u8]) -> HttpResponse {
+    let bytes = fs::read("examples/static/post.html").unwrap();
+    HttpResponse {
+        status: Status::OK,
+        connection: Connection::KeepAlive,
+        body: Some((ContentType::Html, bytes)),
+    }
+}
+
+fn display_post(body: &[u8]) -> HttpResponse {
+    let sanitized: String = body
+        .iter()
+        .map(|&b| if b.is_ascii_control() { '.' } else { b as char })
+        .collect();
+    println!("POST body received: {}", sanitized);
+
+    HttpResponse {
+        status: Status::NoContent,
+        connection: Connection::KeepAlive,
+        body: None,
     }
 }

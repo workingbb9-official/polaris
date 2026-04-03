@@ -1,6 +1,8 @@
 use super::*;
 use std::collections::HashMap;
 
+type HttpHandler = fn(&[u8]) -> HttpResponse;
+
 pub struct HttpMessage {
     method: String,
     path: String,
@@ -63,8 +65,6 @@ impl ContentType {
     }
 }
 
-type HttpHandler = fn(&[u8]) -> HttpResponse;
-
 pub struct HttpProtocol {
     routes: HashMap<String, HttpHandler>,
 }
@@ -102,7 +102,7 @@ impl Protocol for HttpProtocol {
         let headers = parts.next()?;
 
         let value = url_decode(parts.next().unwrap_or(""));
-        let body_str = value.splitn(2, '=').nth(1).unwrap_or(&value);
+        let body_str = value.split_once('=').map(|x| x.1).unwrap_or(&value);
         let body = body_str.as_bytes().to_vec();
 
         let first_line = headers.lines().next()?;

@@ -1,8 +1,8 @@
+use std::num::NonZeroUsize;
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{Duration, timeout};
-
-use std::num::NonZeroUsize;
 
 pub struct Network {
     stream: TcpStream,

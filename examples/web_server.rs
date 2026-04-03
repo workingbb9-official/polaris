@@ -1,10 +1,8 @@
 use log::warn;
-use polaris::{Connection, ContentType, Status};
-use polaris::{HttpProtocol, HttpResponse, NetworkConfig, Server};
+use std::{fs, sync::Arc, time::Duration};
 
-use std::fs;
-use std::sync::Arc;
-use std::time::Duration;
+use polaris::{Connection, ContentType, HttpProtocol, HttpResponse, Status};
+use polaris::{NetworkConfig, Server};
 
 #[tokio::main]
 async fn main() {

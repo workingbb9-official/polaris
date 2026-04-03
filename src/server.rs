@@ -1,12 +1,12 @@
+use log::{info, warn};
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+use tokio::net::{TcpListener, TcpStream};
+
 use crate::network::{Network, NetworkConfig, ReadResult};
 use crate::protocol::Framing;
 use crate::protocol::Protocol;
-
-use log::{info, warn};
-use std::sync::Arc;
-
-use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
 
 pub struct Server<P: Protocol> {
     listener: TcpListener,

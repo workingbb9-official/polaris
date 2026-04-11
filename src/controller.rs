@@ -13,8 +13,8 @@ pub enum ControllerError {
 ///
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
 /// nodes to stay simple and do their specific job. Because it is more complex, it is recommended
-/// for Controller to be running on something that is more resource-rich in order to stay responsive
-/// while maintaining the coordination of the nodes.
+/// for a Controller to be a device that has more resources in order to stay responsive while
+/// maintaining the coordination of the nodes.
 pub struct Controller {
     id: DeviceId,
     nodes: Vec<DeviceId>,
@@ -36,8 +36,8 @@ impl Controller {
     /// # Errors
     ///
     /// * Returns [ControllerError::MaxNodesReached] if # of stored nodes is at 'max_nodes' limit.
-    /// * Returns [ControllerError::DeviceIdInUse] if a stored node or the Controller already has
-    /// that DeviceId.
+    /// * Returns [ControllerError::DeviceIdInUse] if a stored node or the Controller itself
+    ///   already has that DeviceId.
     pub fn add_node(&mut self, id: DeviceId) -> Result<(), ControllerError> {
         if self.nodes.len() >= self.max_nodes {
             return Err(ControllerError::MaxNodesReached);

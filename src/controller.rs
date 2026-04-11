@@ -14,7 +14,7 @@ pub enum ControllerError {
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
 /// nodes to stay simple and do their specific job. Because it is more complex, it is recommended
 /// for Controller to be running on something that is more resource-rich in order to stay responsive
-/// while maintaining the coordination of the nodes. Should be mutable to add nodes.
+/// while maintaining the coordination of the nodes.
 pub struct Controller {
     id: DeviceId,
     nodes: Vec<DeviceId>,

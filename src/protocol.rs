@@ -22,7 +22,6 @@ impl DeviceId {
 pub(crate) struct Message {
     from: DeviceId,
     to: DeviceId,
-    // TODO: make payload length generic.
     payload: [u8; 256],
     len: usize,
 }
@@ -41,14 +40,17 @@ impl Message {
         }
     }
 
+    #[inline]
     pub(crate) fn from(&self) -> DeviceId {
         self.from
     }
 
+    #[inline]
     pub(crate) fn to(&self) -> DeviceId {
         self.to
     }
 
+    #[inline]
     pub(crate) fn payload(&self) -> &[u8] {
         &self.payload[..self.len]
     }

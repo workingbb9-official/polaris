@@ -46,6 +46,7 @@ impl Node {
     }
 
     /// Extract the [DeviceId] of the node.
+    #[inline]
     pub fn id(&self) -> DeviceId {
         self.id
     }

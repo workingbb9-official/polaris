@@ -59,6 +59,24 @@ impl DataMessage {
 
         buf
     }
+
+    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < 4 {
+            return None;
+        }
+
+        let from = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
+        let len = buf[3] as usize;
+
+        if buf.len() < len + 4 {
+            return None;
+        }
+
+        let mut payload = [0u8; 255];
+        payload[..len].copy_from_slice(&buf[4..len + 4]);
+
+        Some(Self { from, payload, len })
+    }
 }
 
 #[derive(Debug, Clone)]

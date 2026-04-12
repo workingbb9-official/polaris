@@ -14,7 +14,7 @@
 
 #![allow(dead_code)]
 
-use crate::device::DeviceId;
+use crate::device::{Device, DeviceId};
 
 /// Errors returned by [Controller].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,16 +54,16 @@ impl Controller {
     /// * Returns [ControllerError::MaxNodesReached] if # of stored nodes is at 'max_nodes' limit.
     /// * Returns [ControllerError::DeviceIdInUse] if a stored node or the Controller itself
     ///   already has that DeviceId.
-    pub fn add_node(&mut self, id: DeviceId) -> Result<(), ControllerError> {
+    pub fn add_node(&mut self, dev: Device) -> Result<(), ControllerError> {
         if self.nodes.len() >= self.max_nodes {
             return Err(ControllerError::MaxNodesReached);
         }
 
-        if self.nodes.contains(&id) || self.id == id {
+        if self.nodes.contains(&dev.id()) || self.id == dev.id() {
             return Err(ControllerError::DeviceIdInUse);
         }
 
-        self.nodes.push(id);
+        self.nodes.push(dev.id());
         Ok(())
     }
 }

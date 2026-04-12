@@ -93,6 +93,23 @@ impl DiscoveryMessage {
     pub(crate) fn new_welcome(controller_id: DeviceId) -> Self {
         DiscoveryMessage::Welcome(controller_id)
     }
+
+    pub(crate) fn to_bytes(&self) -> [u8; 3] {
+        let mut buf = [0u8; 3];
+
+        match self {
+            DiscoveryMessage::Hello(node_id) => {
+                buf[0] = MSG_TYPE_HELLO;
+                buf[1..3].copy_from_slice(&node_id.value().to_be_bytes());
+                buf
+            }
+            DiscoveryMessage::Welcome(controller_id) => {
+                buf[0] = MSG_TYPE_WELCOME;
+                buf[1..3].copy_from_slice(&controller_id.value().to_be_bytes());
+                buf
+            }
+        }
+    }
 }
 
 #[cfg(test)]

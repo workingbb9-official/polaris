@@ -32,16 +32,16 @@ pub enum ControllerError {
 /// for a Controller to be a device that has more resources in order to stay responsive while
 /// maintaining the coordination of the nodes.
 pub struct Controller {
-    id: DeviceId,
+    dev: Device,
     nodes: Vec<DeviceId>,
     max_nodes: usize,
 }
 
 impl Controller {
     /// Creates a new Controller.
-    pub fn new(id: DeviceId, max_nodes: usize) -> Self {
+    pub fn new(dev: Device, max_nodes: usize) -> Self {
         Self {
-            id,
+            dev,
             nodes: Vec::with_capacity(max_nodes),
             max_nodes,
         }
@@ -59,7 +59,7 @@ impl Controller {
             return Err(ControllerError::MaxNodesReached);
         }
 
-        if self.nodes.contains(&dev.id()) || self.id == dev.id() {
+        if self.nodes.contains(&dev.id()) || self.dev.id() == dev.id() {
             return Err(ControllerError::DeviceIdInUse);
         }
 

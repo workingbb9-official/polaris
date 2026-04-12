@@ -14,7 +14,7 @@
 
 #![allow(dead_code)]
 
-use crate::device::DeviceId;
+use crate::device::{Device, DeviceId};
 use crate::protocol::RawMessage;
 
 /// Errors returned by [Node].
@@ -30,7 +30,7 @@ pub enum NodeError {
 /// operates independently, and sends information to a Controller. A node can only connect to one
 /// Controller, and only one with the [DeviceId] chosen on initialization.
 pub struct Node {
-    id: DeviceId,
+    dev: Device,
     controller_id: DeviceId,
     connected: bool,
 }
@@ -40,9 +40,9 @@ impl Node {
     ///
     /// The `controller_id` parameter determines what the node can connect to. Its [DeviceId] must
     /// be compatible with a `Controller` to connect to it.
-    pub fn new(id: DeviceId, controller_id: DeviceId) -> Self {
+    pub fn new(dev: Device, controller_id: DeviceId) -> Self {
         Self {
-            id,
+            dev,
             controller_id,
             connected: false,
         }
@@ -65,12 +65,12 @@ impl Node {
     /// Extract the [DeviceId] of the node.
     #[inline]
     pub fn id(&self) -> DeviceId {
-        self.id
+        self.dev.id()
     }
 
     /// Construct and send a [RawMessage] packet.
     pub fn send(&self, payload: [u8; 256]) -> Result<(), NodeError> {
-        let _msg = RawMessage::new(self.id, self.controller_id, &payload);
+        let _msg = RawMessage::new(self.dev.id(), self.controller_id, &payload);
         todo!("Implement UDP and send 'msg'");
     }
 }

@@ -110,6 +110,24 @@ impl DiscoveryMessage {
             }
         }
     }
+
+    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() != 3 {
+            return None
+        }
+
+        match buf[0] {
+            MSG_TYPE_HELLO => {
+                let node_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
+                Some(Self::Hello(node_id))
+            }
+            MSG_TYPE_WELCOME => {
+                let controller_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
+                Some(Self::Welcome(controller_id))
+            }
+            _ => None
+        }
+    }
 }
 
 #[cfg(test)]

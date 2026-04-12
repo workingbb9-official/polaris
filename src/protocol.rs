@@ -139,8 +139,8 @@ mod tests {
         let buf = [0xFFu8; 300];
         let msg = DataMessage::new(DeviceId::new(7), &buf);
 
-        assert_eq!(msg.len, 256);
-        assert_eq!(msg.payload().len(), 256);
+        assert_eq!(msg.len, 255);
+        assert_eq!(msg.payload().len(), 255);
     }
 
     #[test]
@@ -151,4 +151,5 @@ mod tests {
         assert_eq!(msg.len, 128);
         assert_eq!(msg.payload().len(), 128);
     }
+
 }

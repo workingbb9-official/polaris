@@ -21,6 +21,20 @@ pub struct Device {
     device_type: DeviceType,
 }
 
+impl Device {
+    pub(crate) fn new(id: DeviceId, device_type: DeviceType) -> Self {
+        Self { id, device_type }
+    }
+
+    pub(crate) fn id(&self) -> DeviceId {
+        self.id
+    }
+
+    pub(crate) fn device_type(&self) -> DeviceType {
+        self.device_type
+    }
+}
+
 /// A unique identifier for every [Device].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceId(u64);

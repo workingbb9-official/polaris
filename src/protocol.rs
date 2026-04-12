@@ -23,20 +23,18 @@ pub(crate) const MSG_TYPE_DATA: u8 = 0x04;
 #[derive(Debug, Clone)]
 pub(crate) struct DataMessage {
     from: DeviceId,
-    to: DeviceId,
     payload: [u8; 256],
     len: usize,
 }
 
 impl DataMessage {
-    pub(crate) fn new(from: DeviceId, to: DeviceId, payload: &[u8]) -> Self {
+    pub(crate) fn new(from: DeviceId, payload: &[u8]) -> Self {
         let mut buf = [0u8; 256];
         let len = payload.len().min(256);
         buf[..len].copy_from_slice(&payload[..len]);
 
         Self {
             from,
-            to,
             payload: buf,
             len,
         }
@@ -45,11 +43,6 @@ impl DataMessage {
     #[inline]
     pub(crate) fn from(&self) -> DeviceId {
         self.from
-    }
-
-    #[inline]
-    pub(crate) fn to(&self) -> DeviceId {
-        self.to
     }
 
     #[inline]
@@ -81,7 +74,7 @@ mod tests {
     #[test]
     fn test_new_message_oversized_payload() {
         let buf = [0xFFu8; 300];
-        let msg = DataMessage::new(DeviceId::new(7), DeviceId::new(10), &buf);
+        let msg = DataMessage::new(DeviceId::new(7), &buf);
 
         assert_eq!(msg.len, 256);
         assert_eq!(msg.payload().len(), 256);
@@ -90,7 +83,7 @@ mod tests {
     #[test]
     fn test_new_message_undersized_payload() {
         let buf = [0xFFu8; 128];
-        let msg = DataMessage::new(DeviceId::new(7), DeviceId::new(10), &buf);
+        let msg = DataMessage::new(DeviceId::new(7), &buf);
 
         assert_eq!(msg.len, 128);
         assert_eq!(msg.payload().len(), 128);

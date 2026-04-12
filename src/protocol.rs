@@ -49,6 +49,16 @@ impl DataMessage {
     pub(crate) fn payload(&self) -> &[u8] {
         &self.payload[..self.len]
     }
+
+    pub(crate) fn to_bytes(&self) -> [u8; 263] {
+        let mut buf = [0u8; 263];
+        buf[0] = MSG_TYPE_DATA;
+        buf[1..3].copy_from_slice(&self.from.value().to_be_bytes());
+        buf[3..5].copy_from_slice(&(self.len as u16).to_be_bytes());
+        buf[5..self.len + 5].copy_from_slice(self.payload());
+
+        buf
+    }
 }
 
 #[derive(Debug, Clone)]

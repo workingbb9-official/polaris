@@ -37,36 +37,36 @@ impl Device {
 
 /// A unique identifier for every [Device].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DeviceId(u64);
+pub struct DeviceId(u16);
 
 impl DeviceId {
     /// Creates a new DeviceId.
     #[inline]
-    pub fn new(val: u64) -> Self {
+    pub fn new(val: u16) -> Self {
         Self(val)
     }
 
     /// Accesses the numeric value of the ID.
     #[inline]
-    pub fn value(&self) -> u64 {
+    pub fn value(&self) -> u16 {
         self.0
     }
 }
 
 /// Describes what a [Device] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DeviceType(u64);
+pub struct DeviceType(u16);
 
 impl DeviceType {
     /// Creates a new DeviceType.
     #[inline]
-    pub(crate) fn new(val: u64) -> Self {
+    pub(crate) fn new(val: u16) -> Self {
         Self(val)
     }
 
     /// Accesses the numeric value of the Type.
     #[inline]
-    pub(crate) fn value(&self) -> u64 {
+    pub(crate) fn value(&self) -> u16 {
         self.0
     }
 }

@@ -20,6 +20,7 @@ pub struct Device {
     id: DeviceId,
 }
 
+/// A unique identifier for every [Device].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceId(u64);
 

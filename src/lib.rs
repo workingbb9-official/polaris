@@ -18,5 +18,5 @@ mod node;
 mod protocol;
 
 pub use controller::{Controller, ControllerError};
-pub use device::DeviceId;
+pub use device::{Device, DeviceId, DeviceType};
 pub use node::{Node, NodeError};

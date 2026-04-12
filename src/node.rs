@@ -15,7 +15,7 @@
 #![allow(dead_code)]
 
 use crate::device::{Device, DeviceId};
-use crate::protocol::RawMessage;
+use crate::protocol::DataMessage;
 
 /// Errors returned by [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,15 +62,15 @@ impl Node {
         Ok(())
     }
 
-    /// Extract the [DeviceId] of the node.
+    /// Extract the [Device] of the node.
     #[inline]
-    pub fn id(&self) -> DeviceId {
-        self.dev.id()
+    pub fn dev(&self) -> Device {
+        self.dev
     }
 
-    /// Construct and send a [RawMessage] packet.
+    /// Construct and send a [DataMessage] packet.
     pub fn send(&self, payload: [u8; 256]) -> Result<(), NodeError> {
-        let _msg = RawMessage::new(self.dev.id(), self.controller_id, &payload);
+        let _msg = DataMessage::new(self.dev.id(), self.controller_id, &payload);
         todo!("Implement UDP and send 'msg'");
     }
 }
@@ -78,10 +78,13 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::DeviceType;
 
     #[test]
     fn test_connect_to_wrong_controller() {
-        let mut node = Node::new(DeviceId::new(10), DeviceId::new(11));
+        let node_dev = Device::new(DeviceId::new(10), DeviceType::new(7));
+        let mut node = Node::new(node_dev, DeviceId::new(11));
+
         let err = node.connect(DeviceId::new(15));
 
         assert_eq!(err, Err(NodeError::WrongController));

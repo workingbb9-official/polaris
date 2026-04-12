@@ -18,20 +18,20 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Device {
     id: DeviceId,
-    device_type: DeviceType,
+    dev_type: DeviceType,
 }
 
 impl Device {
-    pub(crate) fn new(id: DeviceId, device_type: DeviceType) -> Self {
-        Self { id, device_type }
+    pub(crate) fn new(id: DeviceId, dev_type: DeviceType) -> Self {
+        Self { id, dev_type }
     }
 
     pub(crate) fn id(&self) -> DeviceId {
         self.id
     }
 
-    pub(crate) fn device_type(&self) -> DeviceType {
-        self.device_type
+    pub(crate) fn dev_type(&self) -> DeviceType {
+        self.dev_type
     }
 }
 

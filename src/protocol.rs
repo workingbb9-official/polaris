@@ -17,14 +17,14 @@
 use crate::device::DeviceId;
 
 #[derive(Debug, Clone)]
-pub(crate) struct RawMessage {
+pub(crate) struct DataMessage {
     from: DeviceId,
     to: DeviceId,
     payload: [u8; 256],
     len: usize,
 }
 
-impl RawMessage {
+impl DataMessage {
     pub(crate) fn new(from: DeviceId, to: DeviceId, payload: &[u8]) -> Self {
         let mut buf = [0u8; 256];
         let len = payload.len().min(256);
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn test_new_message_oversized_payload() {
         let buf = [0xFFu8; 300];
-        let msg = Message::new(DeviceId::new(7), DeviceId::new(10), &buf);
+        let msg = DataMessage::new(DeviceId::new(7), DeviceId::new(10), &buf);
 
         assert_eq!(msg.len, 256);
         assert_eq!(msg.payload().len(), 256);
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn test_new_message_undersized_payload() {
         let buf = [0xFFu8; 128];
-        let msg = Message::new(DeviceId::new(7), DeviceId::new(10), &buf);
+        let msg = DataMessage::new(DeviceId::new(7), DeviceId::new(10), &buf);
 
         assert_eq!(msg.len, 128);
         assert_eq!(msg.payload().len(), 128);

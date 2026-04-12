@@ -66,30 +66,47 @@ impl Controller {
         self.nodes.push(dev.id());
         Ok(())
     }
+
+    pub fn dev(&self) -> Device {
+        self.dev
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::DeviceType;
 
     #[test]
     fn test_max_nodes() {
-        let mut con = Controller::new(DeviceId::new(10), 1);
-        con.add_node(DeviceId::new(7)).unwrap();
+        let con_dev = Device::new(DeviceId::new(10), DeviceType::new(0));
+        let mut con = Controller::new(con_dev, 1);
 
-        let err = con.add_node(DeviceId::new(11));
+        let dev = Device::new(DeviceId::new(7), DeviceType::new(13));
+        con.add_node(dev).unwrap();
+
+        let dev = Device::new(DeviceId::new(11), DeviceType::new(15));
+        let err = con.add_node(dev);
+
         assert_eq!(err, Err(ControllerError::MaxNodesReached));
     }
 
     #[test]
     fn test_device_id_already_used() {
-        let mut con = Controller::new(DeviceId::new(10), 5);
-        con.add_node(DeviceId::new(7)).unwrap();
+        let con_dev = Device::new(DeviceId::new(10), DeviceType::new(0));
+        let mut con = Controller::new(con_dev, 5);
 
-        let err = con.add_node(DeviceId::new(7));
+        let dev = Device::new(DeviceId::new(11), DeviceType::new(13));
+        con.add_node(dev).unwrap();
+
+        let dev = Device::new(DeviceId::new(10), DeviceType::new(7));
+        let err = con.add_node(dev);
+
         assert_eq!(err, Err(ControllerError::DeviceIdInUse));
 
-        let err = con.add_node(DeviceId::new(10));
+        let dev = Device::new(DeviceId::new(11), DeviceType::new(11));
+        let err = con.add_node(dev);
+
         assert_eq!(err, Err(ControllerError::DeviceIdInUse));
     }
 }

@@ -14,33 +14,17 @@
 
 #![allow(dead_code)]
 
-/// A unique identifier for a Device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DeviceId(u64);
-
-impl DeviceId {
-    /// Creates a new DeviceId.
-    #[inline]
-    pub fn new(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Accesses the numeric value of the ID.
-    #[inline]
-    pub fn value(&self) -> u64 {
-        self.0
-    }
-}
+use crate::device::DeviceId;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Message {
+pub(crate) struct RawMessage {
     from: DeviceId,
     to: DeviceId,
     payload: [u8; 256],
     len: usize,
 }
 
-impl Message {
+impl RawMessage {
     pub(crate) fn new(from: DeviceId, to: DeviceId, payload: &[u8]) -> Self {
         let mut buf = [0u8; 256];
         let len = payload.len().min(256);
@@ -67,6 +51,22 @@ impl Message {
     #[inline]
     pub(crate) fn payload(&self) -> &[u8] {
         &self.payload[..self.len]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DiscoveryMessage {
+    Hello(DeviceId),
+    Welcome(DeviceId),
+}
+
+impl DiscoveryMessage {
+    pub(crate) fn new_hello(node_id: DeviceId) -> Self {
+        DiscoveryMessage::Hello(node_id)
+    }
+
+    pub(crate) fn new_welcome(controller_id: DeviceId) -> Self {
+        DiscoveryMessage::Welcome(controller_id)
     }
 }
 

@@ -23,14 +23,14 @@ pub(crate) const MSG_TYPE_DATA: u8 = 0x04;
 #[derive(Debug, Clone)]
 pub(crate) struct DataMessage {
     from: DeviceId,
-    payload: [u8; 256],
+    payload: [u8; 255],
     len: usize,
 }
 
 impl DataMessage {
     pub(crate) fn new(from: DeviceId, payload: &[u8]) -> Self {
-        let mut buf = [0u8; 256];
-        let len = payload.len().min(256);
+        let mut buf = [0u8; 255];
+        let len = payload.len().min(255);
         buf[..len].copy_from_slice(&payload[..len]);
 
         Self {
@@ -50,12 +50,12 @@ impl DataMessage {
         &self.payload[..self.len]
     }
 
-    pub(crate) fn to_bytes(&self) -> [u8; 263] {
-        let mut buf = [0u8; 263];
+    pub(crate) fn to_bytes(&self) -> [u8; 259] {
+        let mut buf = [0u8; 259];
         buf[0] = MSG_TYPE_DATA;
         buf[1..3].copy_from_slice(&self.from.value().to_be_bytes());
-        buf[3..5].copy_from_slice(&(self.len as u16).to_be_bytes());
-        buf[5..self.len + 5].copy_from_slice(self.payload());
+        buf[3] = self.len as u8;
+        buf[4..self.len + 4].copy_from_slice(self.payload());
 
         buf
     }

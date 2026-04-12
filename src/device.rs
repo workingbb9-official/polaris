@@ -18,6 +18,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Device {
     id: DeviceId,
+    device_type: DeviceType,
 }
 
 /// A unique identifier for every [Device].
@@ -37,3 +38,7 @@ impl DeviceId {
         self.0
     }
 }
+
+/// Describes what a [Device] is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceType(u64);

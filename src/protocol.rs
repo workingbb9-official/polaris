@@ -113,7 +113,7 @@ impl DiscoveryMessage {
 
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
         if buf.len() != 3 {
-            return None
+            return None;
         }
 
         match buf[0] {
@@ -125,7 +125,7 @@ impl DiscoveryMessage {
                 let controller_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
                 Some(Self::Welcome(controller_id))
             }
-            _ => None
+            _ => None,
         }
     }
 }
@@ -152,4 +152,16 @@ mod tests {
         assert_eq!(msg.payload().len(), 128);
     }
 
+    #[test]
+    fn test_data_message_round_trip() {
+        let from = DeviceId::new(10);
+        let payload = [0xABu8; 128];
+
+        let msg = DataMessage::new(from, &payload);
+        let bytes = msg.to_bytes();
+        let parsed = DataMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(parsed.from(), from);
+        assert_eq!(parsed.payload(), msg.payload());
+    }
 }

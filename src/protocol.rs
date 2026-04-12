@@ -14,23 +14,7 @@
 
 #![allow(dead_code)]
 
-/// A unique identifier for a device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DeviceId(u64);
-
-impl DeviceId {
-    /// Creates a new DeviceId.
-    #[inline]
-    pub fn new(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Accesses the numeric value of the ID.
-    #[inline]
-    pub fn value(&self) -> u64 {
-        self.0
-    }
-}
+use crate::device::DeviceId;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RawMessage {
@@ -72,9 +56,8 @@ impl RawMessage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum DiscoveryMessage {
-    Hello { node_id: DeviceId },
-
-    Welcome { controller_id: DeviceId },
+    Hello(DeviceId),
+    Welcome(DeviceId),
 }
 
 impl DiscoveryMessage {

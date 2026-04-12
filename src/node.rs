@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::protocol::{DeviceId, RawMessage};
+#![allow(dead_code)]
+
+use crate::device::DeviceId;
+use crate::protocol::RawMessage;
 
 /// Errors returned by [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -12,11 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod controller;
-mod device;
-mod node;
-mod protocol;
+#![allow(dead_code)]
 
-pub use controller::{Controller, ControllerError};
-pub use device::DeviceId;
-pub use node::{Node, NodeError};
+/// Metada for all devices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Device {
+    id: DeviceId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceId(u64);
+
+impl DeviceId {
+    /// Creates a new DeviceId.
+    #[inline]
+    pub fn new(val: u64) -> Self {
+        Self(val)
+    }
+
+    /// Accesses the numeric value of the ID.
+    #[inline]
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+}

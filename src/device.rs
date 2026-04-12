@@ -18,8 +18,24 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Device {
     id: DeviceId,
+    dev_type: DeviceType,
 }
 
+impl Device {
+    pub(crate) fn new(id: DeviceId, dev_type: DeviceType) -> Self {
+        Self { id, dev_type }
+    }
+
+    pub(crate) fn id(&self) -> DeviceId {
+        self.id
+    }
+
+    pub(crate) fn dev_type(&self) -> DeviceType {
+        self.dev_type
+    }
+}
+
+/// A unique identifier for every [Device].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceId(u64);
 
@@ -33,6 +49,24 @@ impl DeviceId {
     /// Accesses the numeric value of the ID.
     #[inline]
     pub fn value(&self) -> u64 {
+        self.0
+    }
+}
+
+/// Describes what a [Device] is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceType(u64);
+
+impl DeviceType {
+    /// Creates a new DeviceType.
+    #[inline]
+    pub(crate) fn new(val: u64) -> Self {
+        Self(val)
+    }
+
+    /// Accesses the numeric value of the Type.
+    #[inline]
+    pub(crate) fn value(&self) -> u64 {
         self.0
     }
 }

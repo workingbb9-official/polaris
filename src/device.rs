@@ -56,3 +56,17 @@ impl DeviceId {
 /// Describes what a [Device] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceType(u64);
+
+impl DeviceType {
+    /// Creates a new DeviceType.
+    #[inline]
+    pub(crate) fn new(val: u64) -> Self {
+        Self(val)
+    }
+
+    /// Accesses the numeric value of the Type.
+    #[inline]
+    pub(crate) fn value(&self) -> u64 {
+        self.0
+    }
+}

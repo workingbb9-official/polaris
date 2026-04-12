@@ -16,6 +16,10 @@
 
 use crate::device::DeviceId;
 
+pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
+pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
+pub(crate) const MSG_TYPE_DATA: u8 = 0x04;
+
 #[derive(Debug, Clone)]
 pub(crate) struct DataMessage {
     from: DeviceId,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::protocol::{DeviceId, Message};
+use crate::protocol::{DeviceId, RawMessage};
 
 /// Errors returned by [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,9 +65,9 @@ impl Node {
         self.id
     }
 
-    /// Construct and send a [Message] packet.
+    /// Construct and send a [RawMessage] packet.
     pub fn send(&self, payload: [u8; 256]) -> Result<(), NodeError> {
-        let _msg = Message::new(self.id, self.controller_id, &payload);
+        let _msg = RawMessage::new(self.id, self.controller_id, &payload);
         todo!("Implement UDP and send 'msg'");
     }
 }

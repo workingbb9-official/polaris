@@ -18,6 +18,7 @@ use crate::device::DeviceId;
 
 pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
 pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
+pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x02;
 pub(crate) const MSG_TYPE_DATA: u8 = 0x04;
 
 #[derive(Debug, Clone)]
@@ -130,6 +131,38 @@ impl DiscoveryMessage {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct HeartbeatMessage {
+    from: DeviceId,
+}
+
+impl HeartbeatMessage {
+    pub(crate) fn new(from: DeviceId) -> Self {
+        Self { from }
+    }
+
+    pub(crate) fn to_bytes(&self) -> [u8; 3] {
+        let mut buf = [0u8; 3];
+
+        buf[0] = MSG_TYPE_HEARTBEAT;
+        buf[1..3].copy_from_slice(&self.from.value().to_be_bytes());
+        buf
+    }
+
+    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() < 3 {
+            return None;
+        }
+
+        let from = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
+        Some(Self { from })
+    }
+
+    pub(crate) fn from(&self) -> DeviceId {
+        self.from
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,10 +220,21 @@ mod tests {
     fn test_discovery_message_trip() {
         let node_id = DeviceId::new(10);
 
-        let msg = DiscoveryMessage::Hello(node_id);
+        let msg = DiscoveryMessage::new_hello(node_id);
         let bytes = msg.to_bytes();
         let parsed = DiscoveryMessage::from_bytes(&bytes);
 
         assert!(matches!(parsed, Some(DiscoveryMessage::Hello(id)) if id == node_id));
+    }
+
+    #[test]
+    fn test_heartbeat_message_trip() {
+        let id = DeviceId::new(10);
+
+        let msg = HeartbeatMessage::new(id);
+        let bytes = msg.to_bytes();
+        let parsed = HeartbeatMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(parsed.from(), id);
     }
 }

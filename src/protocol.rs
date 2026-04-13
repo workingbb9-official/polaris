@@ -18,8 +18,27 @@ use crate::device::DeviceId;
 
 pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
 pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
-pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x02;
-pub(crate) const MSG_TYPE_DATA: u8 = 0x04;
+pub(crate) const MSG_TYPE_DATA: u8 = 0x03;
+pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x04;
+
+pub(crate) enum MessageType {
+    Hello,
+    Welcome,
+    Data,
+    Heartbeat,
+}
+
+impl MessageType {
+    pub(crate) fn from_buf(buf: &[u8]) -> Option<Self> {
+        match buf[0] {
+            MSG_TYPE_HELLO => Some(MessageType::Hello),
+            MSG_TYPE_WELCOME => Some(MessageType::Welcome),
+            MSG_TYPE_DATA => Some(MessageType::Data),
+            MSG_TYPE_HEARTBEAT => Some(MessageType::Heartbeat),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct DataMessage {

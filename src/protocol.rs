@@ -112,7 +112,7 @@ impl DiscoveryMessage {
     }
 
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf.len() != 3 {
+        if buf.len() < 3 {
             return None;
         }
 

@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn test_data_message_round_trip() {
+    fn test_data_message_trip() {
         let from = DeviceId::new(10);
         let payload = [0xABu8; 128];
 
@@ -163,5 +163,34 @@ mod tests {
 
         assert_eq!(parsed.from(), from);
         assert_eq!(parsed.payload(), msg.payload());
+    }
+
+    #[test]
+    fn test_data_message_too_short() {
+        assert!(DataMessage::from_bytes(&[0x04, 0x00]).is_none());
+    }
+
+    #[test]
+    fn test_data_message_long_len() {
+        let mut buf = [0u8; 128];
+        let payload = [0xABu8; 64];
+
+        buf[0] = MSG_TYPE_DATA;
+        buf[1..3].copy_from_slice(&10_u16.to_be_bytes());
+        buf[3] = 255;
+        buf[4..68].copy_from_slice(&payload);
+
+        assert!(DataMessage::from_bytes(&buf).is_none());
+    }
+
+    #[test]
+    fn test_discovery_message_trip() {
+        let node_id = DeviceId::new(10);
+
+        let msg = DiscoveryMessage::Hello(node_id);
+        let bytes = msg.to_bytes();
+        let parsed = DiscoveryMessage::from_bytes(&bytes);
+
+        assert!(matches!(parsed, Some(DiscoveryMessage::Hello(id)) if id == node_id));
     }
 }

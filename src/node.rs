@@ -69,8 +69,8 @@ impl Node {
     }
 
     /// Construct and send a [DataMessage] packet.
-    pub fn send(&self, payload: [u8; 256]) -> Result<(), NodeError> {
-        let _msg = DataMessage::new(self.dev.id(), self.controller_id, &payload);
+    pub fn send(&self, payload: [u8; 255]) -> Result<(), NodeError> {
+        let _msg = DataMessage::new(self.dev.id(), &payload);
         todo!("Implement UDP and send 'msg'");
     }
 }

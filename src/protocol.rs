@@ -14,12 +14,21 @@
 
 #![allow(dead_code)]
 
+use std::net::SocketAddr;
+
 use crate::device::DeviceId;
 
 pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
 pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
 pub(crate) const MSG_TYPE_DATA: u8 = 0x03;
 pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x04;
+
+pub trait Transport {
+    type Error;
+
+    async fn send(&mut self, buf: &[u8], addr: SocketAddr) -> Result<(), Self::Error>;
+    async fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Self::Error>;
+}
 
 pub(crate) enum MessageType {
     Hello,

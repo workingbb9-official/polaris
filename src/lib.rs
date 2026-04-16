@@ -20,4 +20,4 @@ mod protocol;
 pub use controller::{Controller, ControllerError};
 pub use device::{Device, DeviceId, DeviceType};
 pub use node::{Node, NodeError};
-pub use protocol::Transport;
+pub use transport::{Transport, Addr};

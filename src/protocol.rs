@@ -14,6 +14,7 @@
 
 #![allow(dead_code)]
 
+use std::future::Future;
 use std::net::SocketAddr;
 
 use crate::device::DeviceId;
@@ -26,8 +27,15 @@ pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x04;
 pub trait Transport {
     type Error;
 
-    async fn send(&mut self, buf: &[u8], addr: SocketAddr) -> Result<(), Self::Error>;
-    async fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Self::Error>;
+    fn send(
+        &mut self,
+        buf: &[u8],
+        addr: SocketAddr,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn recv(
+        &mut self,
+        buf: &mut [u8],
+    ) -> impl Future<Output = Result<(usize, SocketAddr), Self::Error>> + Send;
 }
 
 pub(crate) enum MessageType {

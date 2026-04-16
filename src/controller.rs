@@ -23,7 +23,7 @@ use crate::{Addr, Transport};
 /// The errors that can occur within a [Controller]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControllerError {
-    /// Used on discovery to represent that the DeviceId given is already used by a stored node or
+    /// Used on discovery to represent that the DeviceId given is already in use by a stored node or
     /// the controller itself.
     DeviceIdInUse,
 }

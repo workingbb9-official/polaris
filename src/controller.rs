@@ -14,7 +14,10 @@
 
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+
 use crate::device::{Device, DeviceId};
+use crate::{Addr, Transport};
 
 /// Errors returned by [Controller].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,82 +34,26 @@ pub enum ControllerError {
 /// nodes to stay simple and do their specific job. Because it is more complex, it is recommended
 /// for a Controller to be a device that has more resources in order to stay responsive while
 /// maintaining the coordination of the nodes.
-pub struct Controller {
+pub struct Controller<T: Transport> {
     dev: Device,
-    nodes: Vec<DeviceId>,
+    nodes: HashMap<DeviceId, Addr>,
     max_nodes: usize,
+    transport: T,
 }
 
-impl Controller {
+impl<T: Transport> Controller<T> {
     /// Creates a new Controller.
-    pub fn new(dev: Device, max_nodes: usize) -> Self {
+    pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
-            nodes: Vec::with_capacity(max_nodes),
+            nodes: HashMap::new(),
             max_nodes,
+            transport,
         }
     }
 
-    /// Adds the [DeviceId] of a node to the internal Controller list.
-    ///
-    /// # Errors
-    ///
-    /// * Returns [ControllerError::MaxNodesReached] if # of stored nodes is at 'max_nodes' limit.
-    /// * Returns [ControllerError::DeviceIdInUse] if a stored node or the Controller itself
-    ///   already has that DeviceId.
-    pub fn add_node(&mut self, dev: Device) -> Result<(), ControllerError> {
-        if self.nodes.len() >= self.max_nodes {
-            return Err(ControllerError::MaxNodesReached);
-        }
-
-        if self.nodes.contains(&dev.id()) || self.dev.id() == dev.id() {
-            return Err(ControllerError::DeviceIdInUse);
-        }
-
-        self.nodes.push(dev.id());
-        Ok(())
-    }
-
+    /// Extract the [Device] of the controller.
     pub fn dev(&self) -> Device {
         self.dev
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::device::DeviceType;
-
-    #[test]
-    fn test_max_nodes() {
-        let con_dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let mut con = Controller::new(con_dev, 1);
-
-        let dev = Device::new(DeviceId::new(7), DeviceType::new(13));
-        con.add_node(dev).unwrap();
-
-        let dev = Device::new(DeviceId::new(11), DeviceType::new(15));
-        let err = con.add_node(dev);
-
-        assert_eq!(err, Err(ControllerError::MaxNodesReached));
-    }
-
-    #[test]
-    fn test_device_id_already_used() {
-        let con_dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let mut con = Controller::new(con_dev, 5);
-
-        let dev = Device::new(DeviceId::new(11), DeviceType::new(13));
-        con.add_node(dev).unwrap();
-
-        let dev = Device::new(DeviceId::new(10), DeviceType::new(7));
-        let err = con.add_node(dev);
-
-        assert_eq!(err, Err(ControllerError::DeviceIdInUse));
-
-        let dev = Device::new(DeviceId::new(11), DeviceType::new(11));
-        let err = con.add_node(dev);
-
-        assert_eq!(err, Err(ControllerError::DeviceIdInUse));
     }
 }

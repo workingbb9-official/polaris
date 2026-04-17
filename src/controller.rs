@@ -15,6 +15,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::device::{Device, DeviceId};
 use crate::{Addr, Transport};
@@ -36,7 +37,7 @@ pub enum ControllerError {
 /// maintaining the coordination of the nodes.
 pub struct Controller<T: Transport> {
     dev: Device,
-    nodes: HashMap<DeviceId, Addr>,
+    nodes: HashMap<DeviceId, (Addr, Instant)>,
     max_nodes: usize,
     transport: T,
 }

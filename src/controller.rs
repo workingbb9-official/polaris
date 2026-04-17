@@ -20,6 +20,14 @@ use std::time::Instant;
 use crate::device::{Device, DeviceId};
 use crate::{Addr, Transport};
 
+/// The errors that can occur within a [Controller]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControllerError {
+    /// Used on discovery to represent that the DeviceId given is already used by a stored node or
+    /// the controller itself.
+    DeviceIdInUse,
+}
+
 /// The main orchestrator of the system.
 ///
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
@@ -53,5 +61,15 @@ impl<T: Transport> Controller<T> {
     pub fn last_seen(&self, id: DeviceId) -> Option<&Instant> {
         let (_, last_seen) = self.nodes.get(&id)?;
         Some(last_seen)
+    }
+
+    /// Add a node to the registry.
+    pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError> {
+        if self.nodes.contains_key(&id) || self.dev.id() == id {
+            return Err(ControllerError::DeviceIdInUse);
+        }
+
+        self.nodes.insert(id, (addr, Instant::now()));
+        Ok(())
     }
 }

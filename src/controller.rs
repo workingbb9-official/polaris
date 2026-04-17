@@ -23,12 +23,12 @@ use crate::{Addr, Transport};
 
 /// The errors that can occur within a [Controller]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControllerError {
+pub enum ControllerError<T: Transport> {
     /// Used on discovery to represent that the DeviceId given is already in use by a stored node or
     /// the controller itself.
     DeviceIdInUse,
-    /// Error sending or receiving.
-    TransportError,
+    /// Error sending or receiving, holds the specific error from the Transport trait.
+    TransportError(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' or the message type was incorrect for the current state.
     InvalidMessage,
@@ -69,7 +69,7 @@ impl<T: Transport> Controller<T> {
     ///
     /// # Errors
     /// * Err(ControllerError::DeviceNotRegistered) - The [DeviceId] was not found in the registry.
-    pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError> {
+    pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError<T>> {
         match self.nodes.get(&id) {
             Some((_, last_seen)) => Ok(*last_seen),
             None => Err(ControllerError::DeviceNotRegistered),
@@ -80,7 +80,7 @@ impl<T: Transport> Controller<T> {
     ///
     /// # Errors
     /// * Err(ControllerError::DeviceIdInUse) - DeviceId being added is already in the registry.
-    pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError> {
+    pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
         if self.nodes.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
         }
@@ -89,11 +89,11 @@ impl<T: Transport> Controller<T> {
         Ok(())
     }
 
-    fn receive(&mut self) -> Result<(), ControllerError> {
+    fn receive(&mut self) -> Result<(), ControllerError<T>> {
         let mut buf = [0u8; 1024];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
-            Err(_) => return Err(ControllerError::TransportError),
+            Err(e) => return Err(ControllerError::TransportError(e)),
         };
 
         if n == 0 {
@@ -133,5 +133,20 @@ impl<T: Transport> Controller<T> {
         };
 
         Ok(())
+    }
+
+    /// Send a [DataMessage] to a node.
+    pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
+        let addr = match self.nodes.get(&node_id) {
+            Some((addr, _)) => *addr,
+            None => return Err(ControllerError::DeviceNotRegistered),
+        };
+
+        let raw = msg.to_bytes();
+
+        match self.transport.send(&raw, addr) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ControllerError::TransportError(e)),
+        }
     }
 }

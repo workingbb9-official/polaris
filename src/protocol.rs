@@ -41,14 +41,14 @@ impl MessageType {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct DataMessage {
+pub struct DataMessage {
     from: DeviceId,
     payload: [u8; 255],
     len: usize,
 }
 
 impl DataMessage {
-    pub(crate) fn new(from: DeviceId, payload: &[u8]) -> Self {
+    pub fn new(from: DeviceId, payload: &[u8]) -> Self {
         let mut buf = [0u8; 255];
         let len = payload.len().min(255);
         buf[..len].copy_from_slice(&payload[..len]);

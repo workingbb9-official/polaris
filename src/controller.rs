@@ -65,13 +65,21 @@ impl<T: Transport> Controller<T> {
         self.dev
     }
 
-    /// Return the last time a node was seen.
-    pub fn last_seen(&self, id: DeviceId) -> Option<&Instant> {
-        let (_, last_seen) = self.nodes.get(&id)?;
-        Some(last_seen)
+    /// Access the last time a node was seen.
+    ///
+    /// # Errors
+    /// * Err(ControllerError::DeviceNotRegistered) - The [DeviceId] was not found in the registry.
+    pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError> {
+        match self.nodes.get(&id) {
+            Some((_, last_seen)) => Ok(*last_seen),
+            None => Err(ControllerError::DeviceNotRegistered),
+        }
     }
 
     /// Add a node to the registry.
+    ///
+    /// # Errors
+    /// * Err(ControllerError::DeviceIdInUse) - DeviceId being added is already in the registry.
     pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError> {
         if self.nodes.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);

@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::device::{Device, DeviceId};
+use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::{Addr, Transport};
 
 /// The errors that can occur within a [Controller]
@@ -26,6 +27,11 @@ pub enum ControllerError {
     /// Used on discovery to represent that the DeviceId given is already in use by a stored node or
     /// the controller itself.
     DeviceIdInUse,
+    /// Error sending or receiving.
+    TransportError,
+    /// The message received was invalid. This could be due to a parsing error or an incorrect
+    /// message type in the current state.
+    InvalidMessage,
 }
 
 /// The main orchestrator of the system.
@@ -70,6 +76,49 @@ impl<T: Transport> Controller<T> {
         }
 
         self.nodes.insert(id, (addr, Instant::now()));
+        Ok(())
+    }
+
+    fn receive(&mut self) -> Result<(), ControllerError> {
+        let mut buf = [0u8; 1024];
+        let (n, addr) = match self.transport.recv(&mut buf) {
+            Ok((n, addr)) => (n, addr),
+            Err(_) => return Err(ControllerError::TransportError),
+        };
+
+        if n == 0 {
+            return Ok(());
+        }
+
+        match MessageType::from_buf(&buf) {
+            Some(MessageType::Hello) => {
+                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(&buf) {
+                    self.add_node(node_id, addr)?;
+                } else {
+                    return Err(ControllerError::InvalidMessage);
+                }
+            }
+            Some(MessageType::Data) => {
+                let msg = DataMessage::from_bytes(&buf);
+                if msg.is_none() {
+                    return Err(ControllerError::InvalidMessage);
+                }
+
+                // Todo: self.handle_data(msg)
+            }
+            Some(MessageType::Welcome) | None => return Err(ControllerError::InvalidMessage),
+            Some(MessageType::Heartbeat) => {
+                let msg = match HeartbeatMessage::from_bytes(&buf) {
+                    Some(msg) => msg,
+                    None => return Err(ControllerError::InvalidMessage),
+                };
+
+                let _node_id = msg.from();
+
+                // Todo: self.update_last_seen(node_id);
+            }
+        };
+
         Ok(())
     }
 }

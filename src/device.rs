@@ -36,7 +36,7 @@ impl Device {
 }
 
 /// A unique identifier for every [Device].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DeviceId(u16);
 
 impl DeviceId {

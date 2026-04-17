@@ -29,9 +29,11 @@ pub enum ControllerError {
     DeviceIdInUse,
     /// Error sending or receiving.
     TransportError,
-    /// The message received was invalid. This could be due to a parsing error or an incorrect
-    /// message type in the current state.
+    /// The message received was invalid. This could be returned if the bytes could not be parsed
+    /// into a 'Message' or the message type was incorrect for the current state.
     InvalidMessage,
+    /// The [DeviceId] received was not found within the Controller registry.
+    DeviceNotRegistered,
 }
 
 /// The main orchestrator of the system.
@@ -104,7 +106,7 @@ impl<T: Transport> Controller<T> {
                     return Err(ControllerError::InvalidMessage);
                 }
 
-                // Todo: self.handle_data(msg)
+                // TODO: self.handle_data(msg)
             }
             Some(MessageType::Welcome) | None => return Err(ControllerError::InvalidMessage),
             Some(MessageType::Heartbeat) => {
@@ -113,9 +115,12 @@ impl<T: Transport> Controller<T> {
                     None => return Err(ControllerError::InvalidMessage),
                 };
 
-                let _node_id = msg.from();
-
-                // Todo: self.update_last_seen(node_id);
+                let node_id = msg.from();
+                if let Some((_, last_seen)) = self.nodes.get_mut(&node_id) {
+                    *last_seen = Instant::now();
+                } else {
+                    return Err(ControllerError::DeviceNotRegistered);
+                }
             }
         };
 

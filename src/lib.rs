@@ -18,7 +18,7 @@ mod node;
 mod protocol;
 mod transport;
 
-pub use controller::{Controller, ControllerError};
+pub use controller::Controller;
 pub use device::{Device, DeviceId, DeviceType};
 pub use node::Node;
 pub use transport::{Addr, Transport};

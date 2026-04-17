@@ -20,15 +20,6 @@ use std::time::Instant;
 use crate::device::{Device, DeviceId};
 use crate::{Addr, Transport};
 
-/// Errors returned by [Controller].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControllerError {
-    /// The Controller contains 'max_nodes' already. No more can be added.
-    MaxNodesReached,
-    /// The [DeviceId] given is already used by a node.
-    DeviceIdInUse,
-}
-
 /// The main orchestrator of the system.
 ///
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
@@ -43,7 +34,7 @@ pub struct Controller<T: Transport> {
 }
 
 impl<T: Transport> Controller<T> {
-    /// Creates a new Controller.
+    /// Create a new Controller.
     pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
@@ -56,5 +47,11 @@ impl<T: Transport> Controller<T> {
     /// Extract the [Device] of the controller.
     pub fn dev(&self) -> Device {
         self.dev
+    }
+
+    /// Return the last time a node was seen.
+    pub fn last_seen(&self, id: DeviceId) -> Option<&Instant> {
+        let (_, last_seen) = self.nodes.get(&id)?;
+        Some(last_seen)
     }
 }

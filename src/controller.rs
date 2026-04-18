@@ -34,6 +34,8 @@ pub enum ControllerError<T: Transport> {
     InvalidMessage,
     /// The [DeviceId] received was not found within the Controller registry.
     DeviceNotRegistered,
+    /// The amount of nodes in the registry has reached 'max_nodes', no more can be added.
+    MaxNodesReached,
 }
 
 /// The main orchestrator of the system.
@@ -83,6 +85,10 @@ impl<T: Transport> Controller<T> {
     pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
         if self.nodes.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
+        }
+
+        if self.nodes.len() >= self.max_nodes {
+            return Err(ControllerError::MaxNodesReached);
         }
 
         self.nodes.insert(id, (addr, Instant::now()));

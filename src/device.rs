@@ -15,7 +15,7 @@
 #![allow(dead_code)]
 
 /// Metada for all devices.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Device {
     id: DeviceId,
     dev_type: DeviceType,
@@ -54,7 +54,7 @@ impl DeviceId {
 }
 
 /// Describes what a [Device] is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DeviceType(u16);
 
 impl DeviceType {

@@ -100,25 +100,28 @@ impl<T: Transport> Controller<T> {
             return Ok(());
         }
 
-        match MessageType::from_buf(&buf) {
+        self.handle_msg(&buf, addr)
+    }
+
+    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<(), ControllerError<T>> {
+        match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
-                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(&buf) {
+                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(buf) {
                     self.add_node(node_id, addr)?;
                 } else {
                     return Err(ControllerError::InvalidMessage);
                 }
             }
             Some(MessageType::Data) => {
-                let msg = DataMessage::from_bytes(&buf);
+                let msg = DataMessage::from_bytes(buf);
                 if msg.is_none() {
                     return Err(ControllerError::InvalidMessage);
                 }
 
                 // TODO: self.handle_data(msg)
             }
-            Some(MessageType::Welcome) | None => return Err(ControllerError::InvalidMessage),
             Some(MessageType::Heartbeat) => {
-                let msg = match HeartbeatMessage::from_bytes(&buf) {
+                let msg = match HeartbeatMessage::from_bytes(buf) {
                     Some(msg) => msg,
                     None => return Err(ControllerError::InvalidMessage),
                 };
@@ -130,6 +133,7 @@ impl<T: Transport> Controller<T> {
                     return Err(ControllerError::DeviceNotRegistered);
                 }
             }
+            Some(MessageType::Welcome) | None => return Err(ControllerError::InvalidMessage),
         };
 
         Ok(())
@@ -148,5 +152,90 @@ impl<T: Transport> Controller<T> {
             Ok(()) => Ok(()),
             Err(e) => Err(ControllerError::TransportError(e)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::device::DeviceType;
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct MockTransport;
+    impl Transport for MockTransport {
+        type Error = bool;
+
+        fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error> {
+            let addr = mock_addr();
+            Ok((buf.len(), addr))
+        }
+    }
+
+    fn mock_addr() -> Addr {
+        Addr {
+            octets: [127, 0, 0, 1],
+            port: 8080,
+        }
+    }
+
+    fn new_mock_controller(max_nodes: usize) -> Controller<MockTransport> {
+        let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
+        let mut con = Controller::new(dev, max_nodes, MockTransport);
+        let addr = mock_addr();
+
+        con.add_node(DeviceId::new(11), addr).unwrap();
+        con
+    }
+
+    #[test]
+    fn test_handle_discovery() {
+        let mut con = new_mock_controller(7);
+        let msg = DiscoveryMessage::new_hello(DeviceId::new(13));
+        let raw = msg.to_bytes();
+        let addr = mock_addr();
+
+        let ret = con.handle_msg(&raw, addr);
+        assert_eq!(ret, Ok(()));
+        assert_eq!(con.nodes.contains_key(&DeviceId::new(13)), true);
+    }
+
+    #[test]
+    fn test_handle_heartbeat() {
+        let mut con = new_mock_controller(7);
+        let msg = HeartbeatMessage::new(DeviceId::new(11));
+        let raw = msg.to_bytes();
+        let addr = mock_addr();
+        let start_time = Instant::now();
+
+        let ret = con.handle_msg(&raw, addr);
+        assert_eq!(ret, Ok(()));
+
+        let seen = con.last_seen(DeviceId::new(11)).unwrap();
+        assert!(seen >= start_time);
+
+        let now = Instant::now();
+        assert!(seen <= now);
+    }
+
+    #[test]
+    fn test_send_data() {
+        let mut con = new_mock_controller(7);
+        let msg = DataMessage::new(DeviceId::new(10), b"hello");
+
+        let ret = con.send(msg, DeviceId::new(11));
+        assert_eq!(ret, Ok(()));
+    }
+
+    #[test]
+    fn test_send_to_unregistered_node() {
+        let mut con = new_mock_controller(7);
+        let msg = DataMessage::new(DeviceId::new(10), b"hello");
+
+        let ret = con.send(msg, DeviceId::new(5));
+        assert_eq!(ret, Err(ControllerError::DeviceNotRegistered));
     }
 }

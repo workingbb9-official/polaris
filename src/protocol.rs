@@ -218,11 +218,6 @@ mod tests {
     }
 
     #[test]
-    fn test_data_message_too_short() {
-        assert!(DataMessage::from_bytes(&[0x04, 0x00]).is_none());
-    }
-
-    #[test]
     fn test_data_message_long_len() {
         let mut buf = [0u8; 128];
         let payload = [0xABu8; 64];

@@ -102,7 +102,7 @@ impl DataMessage {
 #[derive(Debug, Clone)]
 pub(crate) enum DiscoveryMessage {
     Hello(DeviceId),
-    Welcome(DeviceId),
+    Welcome,
 }
 
 impl DiscoveryMessage {
@@ -110,8 +110,8 @@ impl DiscoveryMessage {
         DiscoveryMessage::Hello(node_id)
     }
 
-    pub(crate) fn new_welcome(controller_id: DeviceId) -> Self {
-        DiscoveryMessage::Welcome(controller_id)
+    pub(crate) fn new_welcome() -> Self {
+        DiscoveryMessage::Welcome
     }
 
     pub(crate) fn to_bytes(&self) -> [u8; 3] {
@@ -123,28 +123,20 @@ impl DiscoveryMessage {
                 buf[1..3].copy_from_slice(&node_id.value().to_be_bytes());
                 buf
             }
-            DiscoveryMessage::Welcome(controller_id) => {
+            DiscoveryMessage::Welcome => {
                 buf[0] = MSG_TYPE_WELCOME;
-                buf[1..3].copy_from_slice(&controller_id.value().to_be_bytes());
                 buf
             }
         }
     }
 
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf.len() < 3 {
-            return None;
-        }
-
         match buf[0] {
             MSG_TYPE_HELLO => {
                 let node_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
                 Some(Self::Hello(node_id))
             }
-            MSG_TYPE_WELCOME => {
-                let controller_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
-                Some(Self::Welcome(controller_id))
-            }
+            MSG_TYPE_WELCOME => Some(Self::Welcome),
             _ => None,
         }
     }

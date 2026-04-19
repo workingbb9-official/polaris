@@ -30,7 +30,7 @@ pub enum ControllerError<T: Transport> {
     /// Error sending or receiving, holds the specific error from the Transport trait.
     TransportError(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
-    /// into a 'Message' or the message type was incorrect for the current state.
+    /// into a 'Message' object, or the message type was invalid for a controller to receive.
     InvalidMessage,
     /// The [DeviceId] received was not found within the Controller registry.
     DeviceNotRegistered,
@@ -52,7 +52,7 @@ pub struct Controller<T: Transport> {
 }
 
 impl<T: Transport> Controller<T> {
-    /// Create a new Controller.
+    /// Create a new controller.
     pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
@@ -70,7 +70,7 @@ impl<T: Transport> Controller<T> {
     /// Access the last time a node was seen.
     ///
     /// # Errors
-    /// * Err(ControllerError::DeviceNotRegistered) - The [DeviceId] was not found in the registry.
+    /// * `Err(ControllerError::DeviceNotRegistered)` - The [DeviceId] was not found in the registry.
     pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError<T>> {
         match self.nodes.get(&id) {
             Some((_, last_seen)) => Ok(*last_seen),
@@ -81,7 +81,10 @@ impl<T: Transport> Controller<T> {
     /// Add a node to the registry.
     ///
     /// # Errors
-    /// * Err(ControllerError::DeviceIdInUse) - DeviceId being added is already in the registry.
+    /// * `Err(ControllerError::DeviceIdInUse)` - The [DeviceId] being added is already in the
+    ///   registry.
+    /// * `Err(ControllerError::MaxNodesReached)` - The controller cannot add any more nodes to the
+    ///   registry.
     pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
         if self.nodes.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
@@ -124,7 +127,7 @@ impl<T: Transport> Controller<T> {
                     return Err(ControllerError::InvalidMessage);
                 }
 
-                // TODO: self.handle_data(msg)
+                // TODO: self.handle_data(msg);
             }
             Some(MessageType::Heartbeat) => {
                 let msg = match HeartbeatMessage::from_bytes(buf) {
@@ -146,6 +149,12 @@ impl<T: Transport> Controller<T> {
     }
 
     /// Send a [DataMessage] to a node.
+    ///
+    /// # Errors
+    /// * `Err(ControllerError::DeviceNotRegistered) - The [DeviceId] of the node is not within the
+    ///   registry.
+    /// * `Err(ControllerError::TransportError(e)) - There was an error sending the data over the
+    ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
         let addr = match self.nodes.get(&node_id) {
             Some((addr, _)) => *addr,
@@ -191,9 +200,10 @@ mod tests {
     fn new_mock_controller(max_nodes: usize) -> Controller<MockTransport> {
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
         let mut con = Controller::new(dev, max_nodes, MockTransport);
-        let addr = mock_addr();
 
+        let addr = mock_addr();
         con.add_node(DeviceId::new(11), addr).unwrap();
+
         con
     }
 

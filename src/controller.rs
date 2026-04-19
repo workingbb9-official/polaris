@@ -38,6 +38,11 @@ pub enum ControllerError<T: Transport> {
     MaxNodesReached,
 }
 
+struct NodeEntry {
+    addr: Addr,
+    last_seen: Instant,
+}
+
 /// The main orchestrator of the system.
 ///
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
@@ -46,7 +51,7 @@ pub enum ControllerError<T: Transport> {
 /// maintaining the coordination of the nodes.
 pub struct Controller<T: Transport> {
     dev: Device,
-    nodes: HashMap<DeviceId, (Addr, Instant)>,
+    registry: HashMap<DeviceId, NodeEntry>,
     max_nodes: usize,
     transport: T,
 }
@@ -56,7 +61,7 @@ impl<T: Transport> Controller<T> {
     pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
-            nodes: HashMap::new(),
+            registry: HashMap::new(),
             max_nodes,
             transport,
         }
@@ -72,8 +77,8 @@ impl<T: Transport> Controller<T> {
     /// # Errors
     /// * `Err(ControllerError::DeviceNotRegistered)` - The [DeviceId] was not found in the registry.
     pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError<T>> {
-        match self.nodes.get(&id) {
-            Some((_, last_seen)) => Ok(*last_seen),
+        match self.registry.get(&id) {
+            Some(entry) => Ok(entry.last_seen),
             None => Err(ControllerError::DeviceNotRegistered),
         }
     }
@@ -86,15 +91,20 @@ impl<T: Transport> Controller<T> {
     /// * `Err(ControllerError::MaxNodesReached)` - The controller cannot add any more nodes to the
     ///   registry.
     pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
-        if self.nodes.contains_key(&id) || self.dev.id() == id {
+        if self.registry.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
         }
 
-        if self.nodes.len() >= self.max_nodes {
+        if self.registry.len() >= self.max_nodes {
             return Err(ControllerError::MaxNodesReached);
         }
 
-        self.nodes.insert(id, (addr, Instant::now()));
+        let node = NodeEntry {
+            addr,
+            last_seen: Instant::now(),
+        };
+        self.registry.insert(id, node);
+
         Ok(())
     }
 
@@ -136,8 +146,8 @@ impl<T: Transport> Controller<T> {
                 };
 
                 let node_id = msg.from();
-                if let Some((_, last_seen)) = self.nodes.get_mut(&node_id) {
-                    *last_seen = Instant::now();
+                if let Some(entry) = self.registry.get_mut(&node_id) {
+                    entry.last_seen = Instant::now();
                 } else {
                     return Err(ControllerError::DeviceNotRegistered);
                 }
@@ -156,8 +166,8 @@ impl<T: Transport> Controller<T> {
     /// * `Err(ControllerError::TransportError(e)) - There was an error sending the data over the
     ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
-        let addr = match self.nodes.get(&node_id) {
-            Some((addr, _)) => *addr,
+        let addr = match self.registry.get(&node_id) {
+            Some(entry) => entry.addr,
             None => return Err(ControllerError::DeviceNotRegistered),
         };
 
@@ -216,7 +226,7 @@ mod tests {
 
         let ret = con.handle_msg(&raw, addr);
         assert_eq!(ret, Ok(()));
-        assert_eq!(con.nodes.contains_key(&DeviceId::new(13)), true);
+        assert_eq!(con.registry.contains_key(&DeviceId::new(13)), true);
     }
 
     #[test]

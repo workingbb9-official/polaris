@@ -30,7 +30,7 @@ pub enum ControllerError<T: Transport> {
     /// Error sending or receiving, holds the specific error from the Transport trait.
     TransportError(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
-    /// into a 'Message' or the message type was incorrect for the current state.
+    /// into a 'Message' object, or the message type was invalid for a controller to receive.
     InvalidMessage,
     /// The [DeviceId] received was not found within the Controller registry.
     DeviceNotRegistered,
@@ -124,7 +124,7 @@ impl<T: Transport> Controller<T> {
                     return Err(ControllerError::InvalidMessage);
                 }
 
-                // TODO: self.handle_data(msg)
+                // TODO: self.handle_data(msg);
             }
             Some(MessageType::Heartbeat) => {
                 let msg = match HeartbeatMessage::from_bytes(buf) {

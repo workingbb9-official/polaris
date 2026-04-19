@@ -15,7 +15,7 @@
 #![allow(dead_code)]
 
 use crate::device::Device;
-use crate::protocol::{DataMessage, DiscoveryMessage, MessageType};
+use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::{Addr, Transport};
 
 /// The errors that can occur within a [Node].
@@ -24,10 +24,10 @@ pub enum NodeError<T: Transport> {
     /// The node is not connected to a controller, which is necessary for the operation.
     NotConnected,
     /// There was an error sending or receiving over the transport. This holds the specific error
-    /// from the Transport trait.
+    /// from the [Transport] trait.
     TransportError(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
-    /// into a 'Message' object, or the message type was invalid for a node to receive.
+    /// into a message object, or the message type was invalid for a node to receive.
     InvalidMessage,
 }
 
@@ -42,7 +42,7 @@ pub struct Node<T: Transport> {
 }
 
 impl<T: Transport> Node<T> {
-    /// Create a new Node.
+    /// Create a new node.
     pub fn new(dev: Device, transport: T) -> Self {
         Self {
             dev,
@@ -103,13 +103,33 @@ impl<T: Transport> Node<T> {
     /// Send a [DataMessage] to the controller.
     ///
     /// # Errors
-    /// * 'Err(NodeError::NotConnected)' - There is no controller to send data to.
-    /// * 'Err(NodeError::TransportError(e))' - There was an error sending the data over the wire.
+    /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
+    /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
     pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
         if self.controller.is_none() {
             return Err(NodeError::NotConnected);
         }
 
+        let raw = msg.to_bytes();
+
+        match self.transport.send(&raw, self.controller.unwrap()) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(NodeError::TransportError(e)),
+        }
+    }
+
+    /// Send a heartbeat to the controller.
+    ///
+    /// # Errors
+    /// * `Err(NodeError::NotConnected)` - There is no controller to send heartbeat to.
+    /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
+    ///   wire.
+    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
+        if self.controller.is_none() {
+            return Err(NodeError::NotConnected);
+        }
+
+        let msg = HeartbeatMessage::new(self.dev.id());
         let raw = msg.to_bytes();
 
         match self.transport.send(&raw, self.controller.unwrap()) {

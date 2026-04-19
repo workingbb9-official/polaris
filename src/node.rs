@@ -15,12 +15,23 @@
 #![allow(dead_code)]
 
 use crate::device::Device;
-use crate::{Addr, Transport};
+use crate::protocol::DataMessage;
+use crate::transport::{Addr, Transport};
 
-/// A device which reports to a `Controller`.
+/// The errors that can occur within a [Node].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeError<T: Transport> {
+    /// The node is not connected to a controller, which is necessary for the operation.
+    NotConnected,
+    /// There was an error sending or receiving over the transport. This holds the specific error
+    /// from the Transport trait.
+    TransportError(T::Error),
+}
+
+/// A device which reports to a controller.
 ///
-/// Nodes will remain simple and able to describe any type of device. They can be anything that
-/// operates independently, and sends information to a Controller.
+/// Nodes will remain simple and able to represent any type of device. They can be anything that
+/// operates independently and sends information to a controller.
 pub struct Node<T: Transport> {
     dev: Device,
     controller: Option<Addr>,
@@ -28,7 +39,7 @@ pub struct Node<T: Transport> {
 }
 
 impl<T: Transport> Node<T> {
-    /// Creates a new Node.
+    /// Create a new Node.
     pub fn new(dev: Device, transport: T) -> Self {
         Self {
             dev,
@@ -41,5 +52,23 @@ impl<T: Transport> Node<T> {
     #[inline]
     pub fn dev(&self) -> Device {
         self.dev
+    }
+
+    /// Send a [DataMessage] to the controller.
+    ///
+    /// # Errors
+    /// * 'Err(NodeError::NotConnected)' - There is no controller to send data to.
+    /// * 'Err(NodeError::TransportError(e))' - There was an error sending the data over the wire.
+    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
+        if self.controller.is_none() {
+            return Err(NodeError::NotConnected);
+        }
+
+        let raw = msg.to_bytes();
+
+        match self.transport.send(&raw, self.controller.unwrap()) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(NodeError::TransportError(e)),
+        }
     }
 }

@@ -40,7 +40,7 @@ impl MessageType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataMessage {
     from: DeviceId,
     payload: [u8; 255],

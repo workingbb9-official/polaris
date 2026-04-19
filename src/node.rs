@@ -99,6 +99,7 @@ impl<T: Transport> Node<T> {
 
         Ok(())
     }
+
     /// Send a [DataMessage] to the controller.
     ///
     /// # Errors
@@ -115,5 +116,51 @@ impl<T: Transport> Node<T> {
             Ok(()) => Ok(()),
             Err(e) => Err(NodeError::TransportError(e)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::device::{DeviceId, DeviceType};
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct MockTransport;
+    impl Transport for MockTransport {
+        type Error = bool;
+
+        fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error> {
+            let addr = mock_addr();
+            Ok((buf.len(), addr))
+        }
+    }
+
+    fn mock_addr() -> Addr {
+        Addr {
+            octets: [127, 0, 0, 1],
+            port: 8080,
+        }
+    }
+
+    fn new_mock_node() -> Node<MockTransport> {
+        let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
+        let node = Node::new(dev, MockTransport);
+        node
+    }
+
+    #[test]
+    fn test_handle_discovery() {
+        let mut node = new_mock_node();
+        let msg = DiscoveryMessage::new_welcome();
+        let raw = msg.to_bytes();
+        let addr = mock_addr();
+
+        let ret = node.handle_msg(&raw, addr);
+        assert_eq!(ret, Ok(()));
+        assert_eq!(node.controller, Some(addr));
     }
 }

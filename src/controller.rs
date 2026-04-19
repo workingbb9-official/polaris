@@ -191,9 +191,10 @@ mod tests {
     fn new_mock_controller(max_nodes: usize) -> Controller<MockTransport> {
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
         let mut con = Controller::new(dev, max_nodes, MockTransport);
-        let addr = mock_addr();
 
+        let addr = mock_addr();
         con.add_node(DeviceId::new(11), addr).unwrap();
+
         con
     }
 

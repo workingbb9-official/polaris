@@ -112,7 +112,7 @@ impl<T: Transport> Controller<T> {
         Ok(())
     }
 
-    fn receive(&mut self) -> Result<Option<ControllerEvent>, ControllerError<T>> {
+    pub fn receive(&mut self) -> Result<Option<ControllerEvent>, ControllerError<T>> {
         let mut buf = [0u8; 1024];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),

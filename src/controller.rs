@@ -21,7 +21,18 @@ use crate::device::{Device, DeviceId};
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::{Addr, Transport};
 
-/// The errors that can occur within a [Controller]
+/// The significant events that can occur within a [Controller].
+#[derive(Debug, PartialEq, Eq)]
+pub enum ControllerEvent {
+    /// The controller has received data from a node. Use the [DataMessage] method `.from()` to
+    /// determine the identity of the node.
+    DataReceived(Box<DataMessage>),
+    /// A node has been discovered and added to the registry. Store this [DeviceId], because the
+    /// controller will return this for context on which device has sent data.
+    NodeDiscovered(DeviceId),
+}
+
+/// The errors that can occur within a [Controller].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControllerError<T: Transport> {
     /// Used on discovery to represent that the DeviceId given is already in use by a stored node or
@@ -38,6 +49,11 @@ pub enum ControllerError<T: Transport> {
     MaxNodesReached,
 }
 
+struct NodeEntry {
+    addr: Addr,
+    last_seen: Instant,
+}
+
 /// The main orchestrator of the system.
 ///
 /// All devices communicate through a Controller. Main logic will be decided here, allowing the
@@ -46,7 +62,7 @@ pub enum ControllerError<T: Transport> {
 /// maintaining the coordination of the nodes.
 pub struct Controller<T: Transport> {
     dev: Device,
-    nodes: HashMap<DeviceId, (Addr, Instant)>,
+    registry: HashMap<DeviceId, NodeEntry>,
     max_nodes: usize,
     transport: T,
 }
@@ -56,7 +72,7 @@ impl<T: Transport> Controller<T> {
     pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
-            nodes: HashMap::new(),
+            registry: HashMap::new(),
             max_nodes,
             transport,
         }
@@ -72,33 +88,31 @@ impl<T: Transport> Controller<T> {
     /// # Errors
     /// * `Err(ControllerError::DeviceNotRegistered)` - The [DeviceId] was not found in the registry.
     pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError<T>> {
-        match self.nodes.get(&id) {
-            Some((_, last_seen)) => Ok(*last_seen),
+        match self.registry.get(&id) {
+            Some(entry) => Ok(entry.last_seen),
             None => Err(ControllerError::DeviceNotRegistered),
         }
     }
 
-    /// Add a node to the registry.
-    ///
-    /// # Errors
-    /// * `Err(ControllerError::DeviceIdInUse)` - The [DeviceId] being added is already in the
-    ///   registry.
-    /// * `Err(ControllerError::MaxNodesReached)` - The controller cannot add any more nodes to the
-    ///   registry.
-    pub fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
-        if self.nodes.contains_key(&id) || self.dev.id() == id {
+    fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
+        if self.registry.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
         }
 
-        if self.nodes.len() >= self.max_nodes {
+        if self.registry.len() >= self.max_nodes {
             return Err(ControllerError::MaxNodesReached);
         }
 
-        self.nodes.insert(id, (addr, Instant::now()));
+        let node = NodeEntry {
+            addr,
+            last_seen: Instant::now(),
+        };
+        self.registry.insert(id, node);
+
         Ok(())
     }
 
-    fn receive(&mut self) -> Result<(), ControllerError<T>> {
+    pub fn receive(&mut self) -> Result<Option<ControllerEvent>, ControllerError<T>> {
         let mut buf = [0u8; 1024];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
@@ -106,46 +120,45 @@ impl<T: Transport> Controller<T> {
         };
 
         if n == 0 {
-            return Ok(());
+            return Ok(None);
         }
 
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<(), ControllerError<T>> {
+    fn handle_msg(
+        &mut self,
+        buf: &[u8],
+        addr: Addr,
+    ) -> Result<Option<ControllerEvent>, ControllerError<T>> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
                 if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(buf) {
                     self.add_node(node_id, addr)?;
+                    Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
                 } else {
-                    return Err(ControllerError::InvalidMessage);
+                    Err(ControllerError::InvalidMessage)
                 }
             }
             Some(MessageType::Data) => {
-                let msg = DataMessage::from_bytes(buf);
-                if msg.is_none() {
-                    return Err(ControllerError::InvalidMessage);
-                }
+                let msg = DataMessage::from_bytes(buf).ok_or(ControllerError::InvalidMessage)?;
 
-                // TODO: self.handle_data(msg);
+                Ok(Some(ControllerEvent::DataReceived(Box::new(msg))))
             }
             Some(MessageType::Heartbeat) => {
-                let msg = match HeartbeatMessage::from_bytes(buf) {
-                    Some(msg) => msg,
-                    None => return Err(ControllerError::InvalidMessage),
-                };
+                let msg =
+                    HeartbeatMessage::from_bytes(buf).ok_or(ControllerError::InvalidMessage)?;
 
                 let node_id = msg.from();
-                if let Some((_, last_seen)) = self.nodes.get_mut(&node_id) {
-                    *last_seen = Instant::now();
+                if let Some(entry) = self.registry.get_mut(&node_id) {
+                    entry.last_seen = Instant::now();
+                    Ok(None)
                 } else {
-                    return Err(ControllerError::DeviceNotRegistered);
+                    Err(ControllerError::DeviceNotRegistered)
                 }
             }
-            Some(MessageType::Welcome) | None => return Err(ControllerError::InvalidMessage),
-        };
-
-        Ok(())
+            Some(MessageType::Welcome) | None => Err(ControllerError::InvalidMessage),
+        }
     }
 
     /// Send a [DataMessage] to a node.
@@ -156,8 +169,8 @@ impl<T: Transport> Controller<T> {
     /// * `Err(ControllerError::TransportError(e)) - There was an error sending the data over the
     ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
-        let addr = match self.nodes.get(&node_id) {
-            Some((addr, _)) => *addr,
+        let addr = match self.registry.get(&node_id) {
+            Some(entry) => entry.addr,
             None => return Err(ControllerError::DeviceNotRegistered),
         };
 
@@ -215,8 +228,30 @@ mod tests {
         let addr = mock_addr();
 
         let ret = con.handle_msg(&raw, addr);
-        assert_eq!(ret, Ok(()));
-        assert_eq!(con.nodes.contains_key(&DeviceId::new(13)), true);
+        assert_eq!(
+            ret,
+            Ok(Some(ControllerEvent::NodeDiscovered(DeviceId::new(13))))
+        );
+        assert_eq!(con.registry.contains_key(&DeviceId::new(13)), true);
+    }
+
+    #[test]
+    fn test_handle_data() {
+        let mut con = new_mock_controller(7);
+        let msg = DataMessage::new(DeviceId::new(13), b"hello");
+        let raw = msg.to_bytes();
+        let addr = mock_addr();
+
+        let ret = con.handle_msg(&raw, addr);
+        assert_eq!(ret, Ok(Some(ControllerEvent::DataReceived(Box::new(msg)))));
+
+        match ret {
+            Ok(Some(ControllerEvent::DataReceived(msg))) => {
+                assert_eq!(msg.from(), DeviceId::new(13));
+                assert_eq!(msg.payload(), b"hello");
+            }
+            _ => panic!(),
+        };
     }
 
     #[test]
@@ -228,7 +263,7 @@ mod tests {
         let start_time = Instant::now();
 
         let ret = con.handle_msg(&raw, addr);
-        assert_eq!(ret, Ok(()));
+        assert_eq!(ret, Ok(None));
 
         let seen = con.last_seen(DeviceId::new(11)).unwrap();
         assert!(seen >= start_time);

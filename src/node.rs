@@ -57,7 +57,7 @@ impl<T: Transport> Node<T> {
         self.dev
     }
 
-    fn receive(&mut self) -> Result<(), NodeError<T>> {
+    pub fn receive(&mut self) -> Result<(), NodeError<T>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),

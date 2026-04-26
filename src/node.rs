@@ -18,6 +18,14 @@ use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::{Addr, Transport};
 
+/// The significant events that can occur within a [Node].
+#[derive(Debug, PartialEq, Eq)]
+pub enum NodeEvent {
+    /// The node has connected to a controller. This enables the sending and receiving of data from
+    /// the controller.
+    ControllerConnected,
+}
+
 /// The errors that can occur within a [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeError<T: Transport> {
@@ -57,7 +65,7 @@ impl<T: Transport> Node<T> {
         self.dev
     }
 
-    pub fn receive(&mut self) -> Result<(), NodeError<T>> {
+    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
@@ -65,17 +73,17 @@ impl<T: Transport> Node<T> {
         };
 
         if n == 0 {
-            return Ok(());
+            return Ok(None);
         }
 
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<(), NodeError<T>> {
+    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Welcome) => {
                 if self.controller.is_some() {
-                    return Ok(());
+                    return Ok(None);
                 }
 
                 if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
@@ -83,6 +91,8 @@ impl<T: Transport> Node<T> {
                 } else {
                     return Err(NodeError::InvalidMessage);
                 }
+
+                Ok(Some(NodeEvent::ControllerConnected))
             }
             Some(MessageType::Data) => {
                 let msg = DataMessage::from_bytes(buf);
@@ -90,14 +100,13 @@ impl<T: Transport> Node<T> {
                     return Err(NodeError::InvalidMessage);
                 }
 
+                Ok(None)
                 // TODO: self.handle_data(msg);
             }
             Some(MessageType::Heartbeat) | Some(MessageType::Hello) | None => {
-                return Err(NodeError::InvalidMessage);
+                Err(NodeError::InvalidMessage)
             }
-        };
-
-        Ok(())
+        }
     }
 
     /// Send a [DataMessage] to the controller.
@@ -180,7 +189,7 @@ mod tests {
         let addr = mock_addr();
 
         let ret = node.handle_msg(&raw, addr);
-        assert_eq!(ret, Ok(()));
+        assert_eq!(ret, Ok(Some(NodeEvent::ControllerConnected)));
         assert_eq!(node.controller, Some(addr));
     }
 }

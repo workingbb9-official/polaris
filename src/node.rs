@@ -24,7 +24,7 @@ pub trait NodeApp {
     fn on_data(&mut self, data: &[u8]);
     /// Called when a welcome message is received during discovery phase, and the node is not
     /// already connected to a controller.
-    fn on_discovery(&mut self);
+    fn on_connection(&mut self);
 }
 
 /// The significant events that can occur within a [Node].
@@ -47,8 +47,11 @@ pub enum NodeError<T: Transport> {
     /// from the [Transport] trait.
     TransportError(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
-    /// into a message object, or the message type was invalid for a node to receive.
+    /// into a message object, or the message type was invalid for the current state.
     InvalidMessage,
+    /// The message received was sent from somebody that was not the connected controller. The
+    /// message is dropped for security.
+    WrongController,
 }
 
 /// A device which reports to a controller.
@@ -94,10 +97,14 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     }
 
     fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
-        match MessageType::from_buf(buf) {
-            Some(MessageType::Welcome) => {
-                if self.controller.is_some() {
-                    return Ok(None);
+        let Some(msg_type) = MessageType::from_buf(buf) else {
+            return Err(NodeError::InvalidMessage);
+        };
+
+        match self.controller {
+            None => {
+                if msg_type != MessageType::Welcome {
+                    return Err(NodeError::InvalidMessage);
                 }
 
                 if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
@@ -106,20 +113,24 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
                     return Err(NodeError::InvalidMessage);
                 }
 
-                self.app.on_discovery();
+                self.app.on_connection();
                 Ok(Some(NodeEvent::ControllerConnected))
             }
-            Some(MessageType::Data) => {
-                let msg = DataMessage::from_bytes(buf);
-                let Some(msg) = msg else {
+            Some(con_addr) => {
+                if addr != con_addr {
+                    return Err(NodeError::WrongController);
+                }
+
+                if msg_type != MessageType::Data {
+                    return Err(NodeError::InvalidMessage);
+                }
+
+                let Some(msg) = DataMessage::from_bytes(buf) else {
                     return Err(NodeError::InvalidMessage);
                 };
 
                 self.app.on_data(msg.payload());
                 Ok(Some(NodeEvent::DataReceived))
-            }
-            Some(MessageType::Heartbeat) | Some(MessageType::Hello) | None => {
-                Err(NodeError::InvalidMessage)
             }
         }
     }
@@ -195,7 +206,7 @@ mod tests {
             self.data[..len].copy_from_slice(&data[..len]);
         }
 
-        fn on_discovery(&mut self) {}
+        fn on_connection(&mut self) {}
     }
 
     fn mock_addr() -> Addr {

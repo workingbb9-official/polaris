@@ -7,6 +7,7 @@ pub struct Addr {
     pub port: u16,
 }
 
+/// An interface for I/O between devices.
 pub trait Transport {
     type Error;
 

@@ -20,6 +20,6 @@ mod transport;
 
 pub use controller::Controller;
 pub use device::{Device, DeviceId, DeviceType};
-pub use node::Node;
+pub use node::{Node, NodeApp};
 pub use protocol::DataMessage;
 pub use transport::{Addr, Transport};

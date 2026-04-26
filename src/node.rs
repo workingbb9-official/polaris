@@ -185,6 +185,10 @@ mod tests {
     impl Transport for MockTransport {
         type Error = bool;
 
+        fn broadcast_addr() -> Addr {
+            mock_addr()
+        }
+
         fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
             Ok(())
         }

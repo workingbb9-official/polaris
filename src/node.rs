@@ -191,7 +191,8 @@ mod tests {
 
     impl NodeApp for MockApp {
         fn on_data(&mut self, data: &[u8]) {
-            self.data.copy_from_slice(data);
+            let len = data.len().min(260);
+            self.data[..len].copy_from_slice(&data[..len]);
         }
 
         fn on_discovery(&mut self) {}
@@ -207,19 +208,25 @@ mod tests {
     fn new_mock_node() -> Node<MockTransport, MockApp> {
         let app = MockApp { data: [0u8; 260] };
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let node = Node::new(dev, MockTransport, app);
-        node
-    }
+        let mut node = Node::new(dev, MockTransport, app);
 
-    #[test]
-    fn test_handle_discovery() {
-        let mut node = new_mock_node();
         let msg = DiscoveryMessage::new_welcome();
         let raw = msg.to_bytes();
         let addr = mock_addr();
 
+        node.handle_msg(&raw, addr).unwrap();
+        node
+    }
+
+    #[test]
+    fn test_handle_data() {
+        let mut node = new_mock_node();
+        let msg = DataMessage::new(DeviceId::new(11), b"turn_on");
+        let raw = msg.to_bytes();
+        let addr = mock_addr();
+
         let ret = node.handle_msg(&raw, addr);
-        assert_eq!(ret, Ok(Some(NodeEvent::ControllerConnected)));
-        assert_eq!(node.controller, Some(addr));
+        assert_eq!(ret, Ok(Some(NodeEvent::DataReceived)));
+        assert_eq!(node.app.data[..7], b"turn_on".to_vec());
     }
 }

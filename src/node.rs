@@ -22,6 +22,9 @@ use crate::transport::{Addr, Transport};
 pub trait NodeApp {
     /// Called when a [DataMessage] is received.
     fn on_data(&mut self, data: &[u8]);
+    /// Called when a welcome message is received during discovery phase, and the node is not
+    /// already connected to a controller.
+    fn on_discovery(&mut self);
 }
 
 /// The significant events that can occur within a [Node].
@@ -103,6 +106,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
                     return Err(NodeError::InvalidMessage);
                 }
 
+                self.app.on_discovery();
                 Ok(Some(NodeEvent::ControllerConnected))
             }
             Some(MessageType::Data) => {
@@ -189,6 +193,8 @@ mod tests {
         fn on_data(&mut self, data: &[u8]) {
             self.data.copy_from_slice(data);
         }
+
+        fn on_discovery(&mut self) {}
     }
 
     fn mock_addr() -> Addr {

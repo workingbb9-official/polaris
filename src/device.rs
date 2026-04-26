@@ -14,7 +14,7 @@
 
 #![allow(dead_code)]
 
-/// Metada for all devices.
+/// Metadata for all devices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Device {
     id: DeviceId,

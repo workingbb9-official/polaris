@@ -21,6 +21,7 @@ pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
 pub(crate) const MSG_TYPE_DATA: u8 = 0x03;
 pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x04;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MessageType {
     Hello,
     Welcome,

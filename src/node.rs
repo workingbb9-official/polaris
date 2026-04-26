@@ -18,12 +18,21 @@ use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::{Addr, Transport};
 
+/// The core interface for [Node] logic.
+pub trait NodeApp {
+    /// Called when a [DataMessage] is received.
+    fn on_data(&mut self, data: &[u8]);
+}
+
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
 pub enum NodeEvent {
     /// The node has connected to a controller. This enables the sending and receiving of data from
     /// the controller.
     ControllerConnected,
+    /// The controller has sent a [DataMessage]. The node will pass the data onto the injected
+    /// handler. This event is a notification, the data has already been addressed.
+    DataReceived,
 }
 
 /// The errors that can occur within a [Node].
@@ -43,19 +52,21 @@ pub enum NodeError<T: Transport> {
 ///
 /// Nodes will remain simple and able to represent any type of device. They can be anything that
 /// operates independently and sends information to a controller.
-pub struct Node<T: Transport> {
+pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
     controller: Option<Addr>,
     transport: T,
+    app: A,
 }
 
-impl<T: Transport> Node<T> {
+impl<T: Transport, A: NodeApp> Node<T, A> {
     /// Create a new node.
-    pub fn new(dev: Device, transport: T) -> Self {
+    pub fn new(dev: Device, transport: T, app: A) -> Self {
         Self {
             dev,
             controller: None,
             transport,
+            app,
         }
     }
 
@@ -96,12 +107,12 @@ impl<T: Transport> Node<T> {
             }
             Some(MessageType::Data) => {
                 let msg = DataMessage::from_bytes(buf);
-                if msg.is_none() {
+                let Some(msg) = msg else {
                     return Err(NodeError::InvalidMessage);
-                }
+                };
 
-                Ok(None)
-                // TODO: self.handle_data(msg);
+                self.app.on_data(msg.payload());
+                Ok(Some(NodeEvent::DataReceived))
             }
             Some(MessageType::Heartbeat) | Some(MessageType::Hello) | None => {
                 Err(NodeError::InvalidMessage)
@@ -115,13 +126,13 @@ impl<T: Transport> Node<T> {
     /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
     pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
-        if self.controller.is_none() {
+        let Some(controller) = self.controller else {
             return Err(NodeError::NotConnected);
-        }
+        };
 
         let raw = msg.to_bytes();
 
-        match self.transport.send(&raw, self.controller.unwrap()) {
+        match self.transport.send(&raw, controller) {
             Ok(()) => Ok(()),
             Err(e) => Err(NodeError::TransportError(e)),
         }
@@ -134,14 +145,14 @@ impl<T: Transport> Node<T> {
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
     ///   wire.
     pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
-        if self.controller.is_none() {
+        let Some(controller) = self.controller else {
             return Err(NodeError::NotConnected);
-        }
+        };
 
         let msg = HeartbeatMessage::new(self.dev.id());
         let raw = msg.to_bytes();
 
-        match self.transport.send(&raw, self.controller.unwrap()) {
+        match self.transport.send(&raw, controller) {
             Ok(()) => Ok(()),
             Err(e) => Err(NodeError::TransportError(e)),
         }
@@ -155,6 +166,7 @@ mod tests {
 
     #[derive(Debug, PartialEq, Eq)]
     struct MockTransport;
+
     impl Transport for MockTransport {
         type Error = bool;
 
@@ -168,6 +180,17 @@ mod tests {
         }
     }
 
+    #[derive(Debug, PartialEq, Eq)]
+    struct MockApp {
+        data: [u8; 260],
+    }
+
+    impl NodeApp for MockApp {
+        fn on_data(&mut self, data: &[u8]) {
+            self.data.copy_from_slice(data);
+        }
+    }
+
     fn mock_addr() -> Addr {
         Addr {
             octets: [127, 0, 0, 1],
@@ -175,9 +198,10 @@ mod tests {
         }
     }
 
-    fn new_mock_node() -> Node<MockTransport> {
+    fn new_mock_node() -> Node<MockTransport, MockApp> {
+        let app = MockApp { data: [0u8; 260] };
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let node = Node::new(dev, MockTransport);
+        let node = Node::new(dev, MockTransport, app);
         node
     }
 

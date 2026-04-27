@@ -170,7 +170,7 @@ impl<T: Transport> Controller<T> {
     ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
         let addr = match self.registry.get(&node_id) {
-            Some(entry) => entry.addr,
+            Some(entry) => &entry.addr,
             None => return Err(ControllerError::DeviceNotRegistered),
         };
 
@@ -204,7 +204,7 @@ mod tests {
             new_mock_addr()
         }
 
-        fn send(&mut self, _buf: &[u8], _addr: Self::Addr) -> Result<(), Self::Error> {
+        fn send(&mut self, _buf: &[u8], _addr: &Self::Addr) -> Result<(), Self::Error> {
             Ok(())
         }
 

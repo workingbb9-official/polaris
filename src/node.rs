@@ -101,7 +101,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
             return Err(NodeError::InvalidMessage);
         };
 
-        match self.controller {
+        match self.controller.as_ref() {
             None => {
                 if msg_type != MessageType::Welcome {
                     return Err(NodeError::InvalidMessage);
@@ -117,7 +117,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
                 Ok(Some(NodeEvent::ControllerConnected))
             }
             Some(con_addr) => {
-                if addr != con_addr {
+                if addr != *con_addr {
                     return Err(NodeError::WrongController);
                 }
 
@@ -141,7 +141,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
     pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
-        let Some(controller) = self.controller else {
+        let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
 
@@ -160,7 +160,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
     ///   wire.
     pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
-        let Some(controller) = self.controller else {
+        let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
 
@@ -197,7 +197,7 @@ mod tests {
             new_mock_addr()
         }
 
-        fn send(&mut self, _buf: &[u8], _addr: Self::Addr) -> Result<(), Self::Error> {
+        fn send(&mut self, _buf: &[u8], _addr: &Self::Addr) -> Result<(), Self::Error> {
             Ok(())
         }
 

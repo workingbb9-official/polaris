@@ -1,17 +1,11 @@
-/// A network address used to identify a remote device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Addr {
-    /// IPv4 address as raw bytes.
-    pub octets: [u8; 4],
-    /// Port number.
-    pub port: u16,
-}
+use std::fmt::Debug;
 
 /// An interface for I/O between devices.
 pub trait Transport {
+    type Addr: PartialEq + Clone + Copy + Eq + Debug;
     type Error;
 
-    fn broadcast_addr() -> Addr;
-    fn send(&mut self, buf: &[u8], addr: Addr) -> Result<(), Self::Error>;
-    fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error>;
+    fn broadcast_addr() -> Self::Addr;
+    fn send(&mut self, buf: &[u8], addr: Self::Addr) -> Result<(), Self::Error>;
+    fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Self::Addr), Self::Error>;
 }

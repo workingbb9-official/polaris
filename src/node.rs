@@ -16,7 +16,7 @@
 
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
-use crate::transport::{Addr, Transport};
+use crate::transport::Transport;
 
 /// The core interface for [Node] logic.
 pub trait NodeApp {
@@ -60,7 +60,7 @@ pub enum NodeError<T: Transport> {
 /// operates independently and sends information to a controller.
 pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
-    controller: Option<Addr>,
+    controller: Option<T::Addr>,
     transport: T,
     app: A,
 }
@@ -96,7 +96,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
+    fn handle_msg(&mut self, buf: &[u8], addr: T::Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
         let Some(msg_type) = MessageType::from_buf(buf) else {
             return Err(NodeError::InvalidMessage);
         };
@@ -179,22 +179,30 @@ mod tests {
     use super::*;
     use crate::device::{DeviceId, DeviceType};
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct MockAddr {
+        pub octets: [u8; 4],
+        pub port: u16,
+    }
+
     #[derive(Debug, PartialEq, Eq)]
     struct MockTransport;
 
     impl Transport for MockTransport {
+        type Addr = MockAddr;
+
         type Error = bool;
 
-        fn broadcast_addr() -> Addr {
-            mock_addr()
+        fn broadcast_addr() -> Self::Addr {
+            new_mock_addr()
         }
 
-        fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
+        fn send(&mut self, _buf: &[u8], _addr: Self::Addr) -> Result<(), Self::Error> {
             Ok(())
         }
 
-        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error> {
-            let addr = mock_addr();
+        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Self::Addr), Self::Error> {
+            let addr = new_mock_addr();
             Ok((buf.len(), addr))
         }
     }
@@ -213,8 +221,8 @@ mod tests {
         fn on_connection(&mut self) {}
     }
 
-    fn mock_addr() -> Addr {
-        Addr {
+    fn new_mock_addr() -> MockAddr {
+        MockAddr {
             octets: [127, 0, 0, 1],
             port: 8080,
         }
@@ -227,7 +235,7 @@ mod tests {
 
         let msg = DiscoveryMessage::new_welcome();
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         node.handle_msg(&raw, addr).unwrap();
         node
@@ -238,7 +246,7 @@ mod tests {
         let mut node = new_mock_node();
         let msg = DataMessage::new(DeviceId::new(11), b"turn_on");
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         let ret = node.handle_msg(&raw, addr);
         assert_eq!(ret, Ok(Some(NodeEvent::DataReceived)));

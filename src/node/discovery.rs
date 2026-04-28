@@ -24,18 +24,29 @@ pub enum DiscoveryError<TE> {
 
 pub(crate) struct DiscoveryManager {
     id: DeviceId,
+    send_interval: u32,
+    last_sent: u32,
 }
 
 impl DiscoveryManager {
-    pub(crate) fn new(id: DeviceId) -> Self {
-        Self { id }
+    pub(crate) fn new(id: DeviceId, send_interval: u32) -> Self {
+        Self {
+            id,
+            send_interval,
+            last_sent: 0,
+        }
     }
 
     pub(crate) fn process<T: Transport>(
         &self,
         transport: &mut T,
+        now: u32,
     ) -> Result<(), DiscoveryError<T::Error>> {
-        self.send(transport)
+        if now.wrapping_sub(self.last_sent) >= self.send_interval {
+            self.send(transport)
+        } else {
+            todo!("Implement passive receiving if not sending");
+        }
     }
 
     fn send<T: Transport>(&self, transport: &mut T) -> Result<(), DiscoveryError<T::Error>> {

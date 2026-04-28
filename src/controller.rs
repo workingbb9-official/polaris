@@ -198,7 +198,7 @@ mod tests {
         type Addr = MockAddr;
         type Error = bool;
 
-        fn broadcast_addr() -> Self::Addr {
+        fn broadcast_addr(&mut self) -> Self::Addr {
             new_mock_addr()
         }
 

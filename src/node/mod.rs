@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod discovery;
+
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::Transport;
@@ -191,7 +193,7 @@ mod tests {
 
         type Error = bool;
 
-        fn broadcast_addr() -> Self::Addr {
+        fn broadcast_addr(&mut self) -> Self::Addr {
             new_mock_addr()
         }
 

@@ -22,6 +22,12 @@ pub enum DiscoveryError<TE> {
     Transport(TE),
 }
 
+pub(crate) enum DiscoveryStatus<A> {
+    Broadcasted,
+    Listening,
+    Found(A),
+}
+
 pub(crate) struct DiscoveryManager {
     id: DeviceId,
     send_interval: u32,
@@ -38,18 +44,26 @@ impl DiscoveryManager {
     }
 
     pub(crate) fn process<T: Transport>(
-        &self,
+        &mut self,
         transport: &mut T,
         now: u32,
-    ) -> Result<(), DiscoveryError<T::Error>> {
+    ) -> Result<DiscoveryStatus<T::Addr>, DiscoveryError<T::Error>> {
         if now.wrapping_sub(self.last_sent) >= self.send_interval {
-            self.send(transport)
+            self.last_sent = now;
+            match self.broadcast(transport) {
+                Ok(()) => Ok(DiscoveryStatus::Broadcasted),
+                Err(e) => Err(e),
+            }
         } else {
-            todo!("Implement passive receiving if not sending");
+            match self.listen(transport) {
+                Ok(Some(addr)) => Ok(DiscoveryStatus::Found(addr)),
+                Ok(None) => Ok(DiscoveryStatus::Listening),
+                Err(e) => Err(e),
+            }
         }
     }
 
-    fn send<T: Transport>(&self, transport: &mut T) -> Result<(), DiscoveryError<T::Error>> {
+    fn broadcast<T: Transport>(&self, transport: &mut T) -> Result<(), DiscoveryError<T::Error>> {
         let msg = DiscoveryMessage::new_hello(self.id);
         let raw = msg.to_bytes();
 
@@ -58,6 +72,24 @@ impl DiscoveryManager {
         match transport.send(&raw, &addr) {
             Ok(()) => Ok(()),
             Err(e) => Err(DiscoveryError::Transport(e)),
+        }
+    }
+
+    fn listen<T: Transport>(
+        &self,
+        transport: &mut T,
+    ) -> Result<Option<T::Addr>, DiscoveryError<T::Error>> {
+        let mut buf = [0u8; 8];
+
+        let addr = match transport.recv(&mut buf) {
+            Ok((_, addr)) => addr,
+            Err(e) => return Err(DiscoveryError::Transport(e)),
+        };
+
+        if DiscoveryMessage::from_bytes(&buf).is_none() {
+            Ok(None)
+        } else {
+            Ok(Some(addr))
         }
     }
 }

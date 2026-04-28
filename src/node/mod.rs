@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod discovery;
-
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::Transport;

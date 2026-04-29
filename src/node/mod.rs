@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
+mod discovery;
+pub use discovery::DiscoveryError;
+use discovery::DiscoveryManager;
 
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
-use crate::transport::{Addr, Transport};
+use crate::transport::Transport;
 
 /// The core interface for [Node] logic.
 pub trait NodeApp {
@@ -52,6 +54,8 @@ pub enum NodeError<T: Transport> {
     /// The message received was sent from somebody that was not the connected controller. The
     /// message is dropped for security.
     WrongController,
+    /// There was an error with discovery. The error is held and propagated.
+    Discovery(DiscoveryError<T::Error>),
 }
 
 /// A device which reports to a controller.
@@ -60,17 +64,19 @@ pub enum NodeError<T: Transport> {
 /// operates independently and sends information to a controller.
 pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
-    controller: Option<Addr>,
+    controller: Option<T::Addr>,
+    discovery: DiscoveryManager,
     transport: T,
     app: A,
 }
 
 impl<T: Transport, A: NodeApp> Node<T, A> {
     /// Create a new node.
-    pub fn new(dev: Device, transport: T, app: A) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32, transport: T, app: A) -> Self {
         Self {
             dev,
             controller: None,
+            discovery: DiscoveryManager::new(dev.id(), discovery_interval),
             transport,
             app,
         }
@@ -80,6 +86,16 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     #[inline]
     pub fn dev(&self) -> Device {
         self.dev
+    }
+
+    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T>> {
+        match self.controller.as_ref() {
+            None => match self.discovery.process(&mut self.transport, now) {
+                Ok(_) => Ok(None),
+                Err(e) => Err(NodeError::Discovery(e)),
+            },
+            Some(_) => self.receive(),
+        }
     }
 
     pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T>> {
@@ -96,12 +112,12 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
+    fn handle_msg(&mut self, buf: &[u8], addr: T::Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
         let Some(msg_type) = MessageType::from_buf(buf) else {
             return Err(NodeError::InvalidMessage);
         };
 
-        match self.controller {
+        match self.controller.as_ref() {
             None => {
                 if msg_type != MessageType::Welcome {
                     return Err(NodeError::InvalidMessage);
@@ -117,7 +133,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
                 Ok(Some(NodeEvent::ControllerConnected))
             }
             Some(con_addr) => {
-                if addr != con_addr {
+                if addr != *con_addr {
                     return Err(NodeError::WrongController);
                 }
 
@@ -141,7 +157,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
     pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
-        let Some(controller) = self.controller else {
+        let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
 
@@ -160,7 +176,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
     ///   wire.
     pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
-        let Some(controller) = self.controller else {
+        let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
 
@@ -179,18 +195,30 @@ mod tests {
     use super::*;
     use crate::device::{DeviceId, DeviceType};
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct MockAddr {
+        pub octets: [u8; 4],
+        pub port: u16,
+    }
+
     #[derive(Debug, PartialEq, Eq)]
     struct MockTransport;
 
     impl Transport for MockTransport {
+        type Addr = MockAddr;
+
         type Error = bool;
 
-        fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
+        fn broadcast_addr(&mut self) -> Self::Addr {
+            new_mock_addr()
+        }
+
+        fn send(&mut self, _buf: &[u8], _addr: &Self::Addr) -> Result<(), Self::Error> {
             Ok(())
         }
 
-        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error> {
-            let addr = mock_addr();
+        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Self::Addr), Self::Error> {
+            let addr = new_mock_addr();
             Ok((buf.len(), addr))
         }
     }
@@ -209,8 +237,8 @@ mod tests {
         fn on_connection(&mut self) {}
     }
 
-    fn mock_addr() -> Addr {
-        Addr {
+    fn new_mock_addr() -> MockAddr {
+        MockAddr {
             octets: [127, 0, 0, 1],
             port: 8080,
         }
@@ -219,11 +247,11 @@ mod tests {
     fn new_mock_node() -> Node<MockTransport, MockApp> {
         let app = MockApp { data: [0u8; 260] };
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let mut node = Node::new(dev, MockTransport, app);
+        let mut node = Node::new(dev, 100, MockTransport, app);
 
         let msg = DiscoveryMessage::new_welcome();
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         node.handle_msg(&raw, addr).unwrap();
         node
@@ -234,7 +262,7 @@ mod tests {
         let mut node = new_mock_node();
         let msg = DataMessage::new(DeviceId::new(11), b"turn_on");
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         let ret = node.handle_msg(&raw, addr);
         assert_eq!(ret, Ok(Some(NodeEvent::DataReceived)));

@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::time::Instant;
 
+use crate::Transport;
 use crate::device::{Device, DeviceId};
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
-use crate::{Addr, Transport};
 
 /// The significant events that can occur within a [Controller].
 #[derive(Debug, PartialEq, Eq)]
@@ -49,8 +47,8 @@ pub enum ControllerError<T: Transport> {
     MaxNodesReached,
 }
 
-struct NodeEntry {
-    addr: Addr,
+struct NodeEntry<N> {
+    addr: N,
     last_seen: Instant,
 }
 
@@ -62,7 +60,7 @@ struct NodeEntry {
 /// maintaining the coordination of the nodes.
 pub struct Controller<T: Transport> {
     dev: Device,
-    registry: HashMap<DeviceId, NodeEntry>,
+    registry: HashMap<DeviceId, NodeEntry<T::Addr>>,
     max_nodes: usize,
     transport: T,
 }
@@ -94,7 +92,7 @@ impl<T: Transport> Controller<T> {
         }
     }
 
-    fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), ControllerError<T>> {
+    fn add_node(&mut self, id: DeviceId, addr: T::Addr) -> Result<(), ControllerError<T>> {
         if self.registry.contains_key(&id) || self.dev.id() == id {
             return Err(ControllerError::DeviceIdInUse);
         }
@@ -129,7 +127,7 @@ impl<T: Transport> Controller<T> {
     fn handle_msg(
         &mut self,
         buf: &[u8],
-        addr: Addr,
+        addr: T::Addr,
     ) -> Result<Option<ControllerEvent>, ControllerError<T>> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
@@ -170,7 +168,7 @@ impl<T: Transport> Controller<T> {
     ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
         let addr = match self.registry.get(&node_id) {
-            Some(entry) => entry.addr,
+            Some(entry) => &entry.addr,
             None => return Err(ControllerError::DeviceNotRegistered),
         };
 
@@ -188,23 +186,34 @@ mod tests {
     use super::*;
     use crate::device::DeviceType;
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct MockAddr {
+        pub octets: [u8; 4],
+        pub port: u16,
+    }
+
     #[derive(Debug, PartialEq, Eq)]
     struct MockTransport;
     impl Transport for MockTransport {
+        type Addr = MockAddr;
         type Error = bool;
 
-        fn send(&mut self, _buf: &[u8], _addr: Addr) -> Result<(), Self::Error> {
+        fn broadcast_addr(&mut self) -> Self::Addr {
+            new_mock_addr()
+        }
+
+        fn send(&mut self, _buf: &[u8], _addr: &Self::Addr) -> Result<(), Self::Error> {
             Ok(())
         }
 
-        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Addr), Self::Error> {
-            let addr = mock_addr();
+        fn recv(&mut self, buf: &mut [u8]) -> Result<(usize, Self::Addr), Self::Error> {
+            let addr = new_mock_addr();
             Ok((buf.len(), addr))
         }
     }
 
-    fn mock_addr() -> Addr {
-        Addr {
+    fn new_mock_addr() -> MockAddr {
+        MockAddr {
             octets: [127, 0, 0, 1],
             port: 8080,
         }
@@ -214,7 +223,7 @@ mod tests {
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
         let mut con = Controller::new(dev, max_nodes, MockTransport);
 
-        let addr = mock_addr();
+        let addr = new_mock_addr();
         con.add_node(DeviceId::new(11), addr).unwrap();
 
         con
@@ -225,7 +234,7 @@ mod tests {
         let mut con = new_mock_controller(7);
         let msg = DiscoveryMessage::new_hello(DeviceId::new(13));
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         let ret = con.handle_msg(&raw, addr);
         assert_eq!(
@@ -240,7 +249,7 @@ mod tests {
         let mut con = new_mock_controller(7);
         let msg = DataMessage::new(DeviceId::new(13), b"hello");
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
 
         let ret = con.handle_msg(&raw, addr);
         assert_eq!(ret, Ok(Some(ControllerEvent::DataReceived(Box::new(msg)))));
@@ -259,7 +268,7 @@ mod tests {
         let mut con = new_mock_controller(7);
         let msg = HeartbeatMessage::new(DeviceId::new(11));
         let raw = msg.to_bytes();
-        let addr = mock_addr();
+        let addr = new_mock_addr();
         let start_time = Instant::now();
 
         let ret = con.handle_msg(&raw, addr);

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 mod discovery;
-use discovery::{DiscoveryError, DiscoveryManager};
+pub use discovery::DiscoveryError;
+use discovery::DiscoveryManager;
 
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};

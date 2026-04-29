@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod discovery;
+use discovery::{DiscoveryError, DiscoveryManager};
+
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 use crate::transport::Transport;
@@ -50,6 +53,8 @@ pub enum NodeError<T: Transport> {
     /// The message received was sent from somebody that was not the connected controller. The
     /// message is dropped for security.
     WrongController,
+    /// There was an error with discovery. The error is held and propagated.
+    Discovery(DiscoveryError<T::Error>),
 }
 
 /// A device which reports to a controller.
@@ -59,16 +64,18 @@ pub enum NodeError<T: Transport> {
 pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
     controller: Option<T::Addr>,
+    discovery: DiscoveryManager,
     transport: T,
     app: A,
 }
 
 impl<T: Transport, A: NodeApp> Node<T, A> {
     /// Create a new node.
-    pub fn new(dev: Device, transport: T, app: A) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32, transport: T, app: A) -> Self {
         Self {
             dev,
             controller: None,
+            discovery: DiscoveryManager::new(dev.id(), discovery_interval),
             transport,
             app,
         }
@@ -78,6 +85,16 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     #[inline]
     pub fn dev(&self) -> Device {
         self.dev
+    }
+
+    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T>> {
+        match self.controller.as_ref() {
+            None => match self.discovery.process(&mut self.transport, now) {
+                Ok(_) => Ok(None),
+                Err(e) => Err(NodeError::Discovery(e)),
+            },
+            Some(_) => self.receive(),
+        }
     }
 
     pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T>> {
@@ -229,7 +246,7 @@ mod tests {
     fn new_mock_node() -> Node<MockTransport, MockApp> {
         let app = MockApp { data: [0u8; 260] };
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let mut node = Node::new(dev, MockTransport, app);
+        let mut node = Node::new(dev, 100, MockTransport, app);
 
         let msg = DiscoveryMessage::new_welcome();
         let raw = msg.to_bytes();

@@ -18,10 +18,12 @@ use crate::device::DeviceId;
 use crate::protocol::DiscoveryMessage;
 use crate::transport::Transport;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiscoveryError<TE> {
     Transport(TE),
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DiscoveryStatus<A> {
     Broadcasted,
     Listening,

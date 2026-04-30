@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
-
 use crate::device::DeviceId;
 use crate::protocol::DiscoveryMessage;
 use crate::transport::Transport;
@@ -30,16 +28,17 @@ pub(crate) enum DiscoveryStatus<A> {
     Found(A),
 }
 
+#[derive(Debug)]
 pub(crate) struct DiscoveryManager {
-    id: DeviceId,
+    node_id: DeviceId,
     send_interval: u32,
     last_sent: u32,
 }
 
 impl DiscoveryManager {
-    pub(crate) fn new(id: DeviceId, send_interval: u32) -> Self {
+    pub(crate) fn new(node_id: DeviceId, send_interval: u32) -> Self {
         Self {
-            id,
+            node_id,
             send_interval,
             last_sent: 0,
         }
@@ -66,7 +65,7 @@ impl DiscoveryManager {
     }
 
     fn broadcast<T: Transport>(&self, transport: &mut T) -> Result<(), DiscoveryError<T::Error>> {
-        let msg = DiscoveryMessage::new_hello(self.id);
+        let msg = DiscoveryMessage::new_hello(self.node_id);
         let raw = msg.to_bytes();
 
         let addr = transport.broadcast_addr();

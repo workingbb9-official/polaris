@@ -14,6 +14,10 @@
 
 #![allow(dead_code)]
 
+use crate::device::DeviceId;
+use crate::protocol::HeartbeatMessage;
+use crate::transport::Transport;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeartbeatError<TE> {
     Transport(TE),
@@ -24,4 +28,42 @@ pub(crate) struct HeartbeatManager {
     node_id: DeviceId,
     send_interval: u32,
     last_sent: u32,
+}
+
+impl HeartbeatManager {
+    pub(crate) fn new(node_id: DeviceId, send_interval: u32) -> Self {
+        Self {
+            node_id,
+            send_interval,
+            last_sent: 0,
+        }
+    }
+
+    pub(crate) fn process<T: Transport>(
+        &mut self,
+        transport: &mut T,
+        controller_addr: &T::Addr,
+        now: u32,
+    ) -> Result<(), HeartbeatError<T::Error>> {
+        if now.wrapping_sub(self.last_sent) >= self.send_interval {
+            self.last_sent = now;
+            self.send_heartbeat(transport, controller_addr)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn send_heartbeat<T: Transport>(
+        &self,
+        transport: &mut T,
+        controller_addr: &T::Addr,
+    ) -> Result<(), HeartbeatError<T::Error>> {
+        let msg = HeartbeatMessage::new(self.node_id);
+        let raw = msg.to_bytes();
+
+        match transport.send(&raw, controller_addr) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(HeartbeatError::Transport(e)),
+        }
+    }
 }

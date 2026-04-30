@@ -13,6 +13,8 @@
 // limitations under the License.
 
 mod discovery;
+mod heartbeat;
+
 pub use discovery::DiscoveryError;
 use discovery::DiscoveryManager;
 

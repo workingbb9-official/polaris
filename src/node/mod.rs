@@ -42,12 +42,12 @@ pub enum NodeEvent {
 
 /// The errors that can occur within a [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeError<T: Transport> {
+pub enum NodeError<TE> {
     /// The node is not connected to a controller, which is necessary for the operation.
     NotConnected,
     /// There was an error sending or receiving over the transport. This holds the specific error
     /// from the [Transport] trait.
-    TransportError(T::Error),
+    TransportError(TE),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a message object, or the message type was invalid for the current state.
     InvalidMessage,
@@ -55,7 +55,7 @@ pub enum NodeError<T: Transport> {
     /// message is dropped for security.
     WrongController,
     /// There was an error with discovery. The error is held and propagated.
-    Discovery(DiscoveryError<T::Error>),
+    Discovery(DiscoveryError<TE>),
 }
 
 /// A device which reports to a controller.
@@ -88,7 +88,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.dev
     }
 
-    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T>> {
+    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         match self.controller.as_ref() {
             None => match self.discovery.process(&mut self.transport, now) {
                 Ok(_) => Ok(None),
@@ -98,7 +98,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         }
     }
 
-    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T>> {
+    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
@@ -112,7 +112,11 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: T::Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
+    fn handle_msg(
+        &mut self,
+        buf: &[u8],
+        addr: T::Addr,
+    ) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let Some(msg_type) = MessageType::from_buf(buf) else {
             return Err(NodeError::InvalidMessage);
         };
@@ -156,7 +160,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// # Errors
     /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
-    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
+    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T::Error>> {
         let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
@@ -175,7 +179,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::NotConnected)` - There is no controller to send heartbeat to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
     ///   wire.
-    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
+    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T::Error>> {
         let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };

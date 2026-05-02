@@ -13,8 +13,13 @@
 // limitations under the License.
 
 mod discovery;
+mod heartbeat;
+
 pub use discovery::DiscoveryError;
 use discovery::DiscoveryManager;
+
+pub use heartbeat::HeartbeatError;
+use heartbeat::HeartbeatManager;
 
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
@@ -42,12 +47,12 @@ pub enum NodeEvent {
 
 /// The errors that can occur within a [Node].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeError<T: Transport> {
+pub enum NodeError<TE> {
     /// The node is not connected to a controller, which is necessary for the operation.
     NotConnected,
     /// There was an error sending or receiving over the transport. This holds the specific error
     /// from the [Transport] trait.
-    TransportError(T::Error),
+    TransportError(TE),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a message object, or the message type was invalid for the current state.
     InvalidMessage,
@@ -55,7 +60,9 @@ pub enum NodeError<T: Transport> {
     /// message is dropped for security.
     WrongController,
     /// There was an error with discovery. The error is held and propagated.
-    Discovery(DiscoveryError<T::Error>),
+    Discovery(DiscoveryError<TE>),
+    /// There was an error with sending heartbeat. The error is held and propagated.
+    Heartbeat(HeartbeatError<TE>),
 }
 
 /// A device which reports to a controller.
@@ -66,17 +73,25 @@ pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
     controller: Option<T::Addr>,
     discovery: DiscoveryManager,
+    heartbeat: HeartbeatManager,
     transport: T,
     app: A,
 }
 
 impl<T: Transport, A: NodeApp> Node<T, A> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32, transport: T, app: A) -> Self {
+    pub fn new(
+        dev: Device,
+        discovery_interval: u32,
+        heartbeat_interval: u32,
+        transport: T,
+        app: A,
+    ) -> Self {
         Self {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(dev.id(), discovery_interval),
+            heartbeat: HeartbeatManager::new(dev.id(), heartbeat_interval),
             transport,
             app,
         }
@@ -88,17 +103,23 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.dev
     }
 
-    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T>> {
+    pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         match self.controller.as_ref() {
             None => match self.discovery.process(&mut self.transport, now) {
                 Ok(_) => Ok(None),
                 Err(e) => Err(NodeError::Discovery(e)),
             },
-            Some(_) => self.receive(),
+            Some(con_addr) => {
+                match self.heartbeat.process(&mut self.transport, con_addr, now) {
+                    Ok(()) => (),
+                    Err(e) => return Err(NodeError::Heartbeat(e)),
+                }
+                self.receive()
+            }
         }
     }
 
-    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T>> {
+    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
@@ -112,7 +133,11 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.handle_msg(&buf, addr)
     }
 
-    fn handle_msg(&mut self, buf: &[u8], addr: T::Addr) -> Result<Option<NodeEvent>, NodeError<T>> {
+    fn handle_msg(
+        &mut self,
+        buf: &[u8],
+        addr: T::Addr,
+    ) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let Some(msg_type) = MessageType::from_buf(buf) else {
             return Err(NodeError::InvalidMessage);
         };
@@ -156,7 +181,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// # Errors
     /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
-    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T>> {
+    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T::Error>> {
         let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
@@ -175,7 +200,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     /// * `Err(NodeError::NotConnected)` - There is no controller to send heartbeat to.
     /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
     ///   wire.
-    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T>> {
+    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T::Error>> {
         let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
@@ -247,7 +272,7 @@ mod tests {
     fn new_mock_node() -> Node<MockTransport, MockApp> {
         let app = MockApp { data: [0u8; 260] };
         let dev = Device::new(DeviceId::new(10), DeviceType::new(0));
-        let mut node = Node::new(dev, 100, MockTransport, app);
+        let mut node = Node::new(dev, 100, 50, MockTransport, app);
 
         let msg = DiscoveryMessage::new_welcome();
         let raw = msg.to_bytes();

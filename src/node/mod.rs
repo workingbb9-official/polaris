@@ -15,14 +15,14 @@
 mod discovery;
 mod heartbeat;
 
-pub use discovery::DiscoveryError;
+use discovery::DiscoveryAction;
 use discovery::DiscoveryManager;
 
 pub use heartbeat::HeartbeatError;
 use heartbeat::HeartbeatManager;
 
 use crate::device::Device;
-use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
+use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage};
 use crate::transport::Transport;
 
 /// The core interface for [Node] logic.
@@ -59,8 +59,6 @@ pub enum NodeError<TE> {
     /// The message received was sent from somebody that was not the connected controller. The
     /// message is dropped for security.
     WrongController,
-    /// There was an error with discovery. The error is held and propagated.
-    Discovery(DiscoveryError<TE>),
     /// There was an error with sending heartbeat. The error is held and propagated.
     Heartbeat(HeartbeatError<TE>),
 }
@@ -90,7 +88,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         Self {
             dev,
             controller: None,
-            discovery: DiscoveryManager::new(dev.id(), discovery_interval),
+            discovery: DiscoveryManager::new(discovery_interval),
             heartbeat: HeartbeatManager::new(dev.id(), heartbeat_interval),
             transport,
             app,
@@ -104,22 +102,20 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     }
 
     pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
-        match self.controller.as_ref() {
-            None => match self.discovery.process(&mut self.transport, now) {
-                Ok(_) => Ok(None),
-                Err(e) => Err(NodeError::Discovery(e)),
-            },
-            Some(con_addr) => {
-                match self.heartbeat.process(&mut self.transport, con_addr, now) {
-                    Ok(()) => (),
-                    Err(e) => return Err(NodeError::Heartbeat(e)),
-                }
-                self.receive()
-            }
+        let event = self.receive()?;
+
+        if let Some(con_addr) = self.controller.as_ref() {
+            self.heartbeat
+                .process(&mut self.transport, con_addr, now)
+                .map_err(NodeError::Heartbeat)?;
+        } else if self.discovery.action(now) == DiscoveryAction::Broadcast {
+            self.broadcast()?;
         }
+
+        Ok(event)
     }
 
-    pub fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
+    fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
@@ -130,7 +126,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
             return Ok(None);
         }
 
-        self.handle_msg(&buf, addr)
+        self.handle_msg(&buf[..n], addr)
     }
 
     fn handle_msg(
@@ -138,42 +134,38 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         buf: &[u8],
         addr: T::Addr,
     ) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
-        let Some(msg_type) = MessageType::from_buf(buf) else {
-            return Err(NodeError::InvalidMessage);
-        };
-
-        match self.controller.as_ref() {
-            None => {
-                if msg_type != MessageType::Welcome {
-                    return Err(NodeError::InvalidMessage);
-                }
-
-                if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
-                    self.controller = Some(addr);
-                } else {
-                    return Err(NodeError::InvalidMessage);
-                }
-
-                self.app.on_connection();
-                Ok(Some(NodeEvent::ControllerConnected))
+        if let Some(con_addr) = self.controller.as_ref() {
+            if addr != *con_addr {
+                return Err(NodeError::WrongController);
             }
-            Some(con_addr) => {
-                if addr != *con_addr {
-                    return Err(NodeError::WrongController);
-                }
 
-                if msg_type != MessageType::Data {
-                    return Err(NodeError::InvalidMessage);
-                }
-
-                let Some(msg) = DataMessage::from_bytes(buf) else {
-                    return Err(NodeError::InvalidMessage);
-                };
-
+            if let Some(msg) = DataMessage::from_bytes(buf) {
                 self.app.on_data(msg.payload());
-                Ok(Some(NodeEvent::DataReceived))
+            } else {
+                return Err(NodeError::InvalidMessage);
             }
+
+            Ok(Some(NodeEvent::DataReceived))
+        } else {
+            if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
+                self.controller = Some(addr);
+                self.app.on_connection();
+            } else {
+                return Err(NodeError::InvalidMessage);
+            }
+
+            Ok(Some(NodeEvent::ControllerConnected))
         }
+    }
+
+    fn broadcast(&mut self) -> Result<(), NodeError<T::Error>> {
+        let msg = DiscoveryMessage::new_hello(self.dev.id());
+        let raw = msg.to_bytes();
+        let addr = self.transport.broadcast_addr();
+
+        self.transport
+            .send(&raw, &addr)
+            .map_err(NodeError::TransportError)
     }
 
     /// Send a [DataMessage] to the controller.

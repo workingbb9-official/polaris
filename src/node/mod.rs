@@ -100,6 +100,13 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         self.dev
     }
 
+    /// Receive and process incoming packets, then send heartbeat or discovery as needed.
+    ///
+    /// # Errors
+    /// * `Err(NodeError::WrongController)` - Received a packet from a different address.
+    /// * `Err(NodeError::InvalidMessage)` - The message received was invalid. This could be due to
+    ///   an incorrect format, or a wrong packet type for the current Node state.
+    /// * `Err(NodeError::Transport(e))` - There was an error sending or receiving a packet.
     pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let event = self.receive()?;
 

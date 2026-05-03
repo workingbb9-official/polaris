@@ -18,7 +18,7 @@ mod heartbeat;
 use discovery::DiscoveryAction;
 use discovery::DiscoveryManager;
 
-pub use heartbeat::HeartbeatError;
+use heartbeat::HeartbeatAction;
 use heartbeat::HeartbeatManager;
 
 use crate::device::Device;
@@ -59,14 +59,13 @@ pub enum NodeError<TE> {
     /// The message received was sent from somebody that was not the connected controller. The
     /// message is dropped for security.
     WrongController,
-    /// There was an error with sending heartbeat. The error is held and propagated.
-    Heartbeat(HeartbeatError<TE>),
 }
 
 /// A device which reports to a controller.
 ///
 /// Nodes will remain simple and able to represent any type of device. They can be anything that
 /// operates independently and sends information to a controller.
+#[derive(Debug)]
 pub struct Node<T: Transport, A: NodeApp> {
     dev: Device,
     controller: Option<T::Addr>,
@@ -89,7 +88,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(discovery_interval),
-            heartbeat: HeartbeatManager::new(dev.id(), heartbeat_interval),
+            heartbeat: HeartbeatManager::new(heartbeat_interval),
             transport,
             app,
         }
@@ -104,10 +103,10 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let event = self.receive()?;
 
-        if let Some(con_addr) = self.controller.as_ref() {
-            self.heartbeat
-                .process(&mut self.transport, con_addr, now)
-                .map_err(NodeError::Heartbeat)?;
+        if self.controller.as_ref().is_some() {
+            if self.heartbeat.action(now) == HeartbeatAction::Send {
+                self.send_heartbeat()?;
+            }
         } else if self.discovery.action(now) == DiscoveryAction::Broadcast {
             self.broadcast()?;
         }
@@ -180,10 +179,9 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
 
         let raw = msg.to_bytes();
 
-        match self.transport.send(&raw, controller) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(NodeError::TransportError(e)),
-        }
+        self.transport
+            .send(&raw, controller)
+            .map_err(NodeError::TransportError)
     }
 
     /// Send a heartbeat to the controller.
@@ -200,10 +198,9 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         let msg = HeartbeatMessage::new(self.dev.id());
         let raw = msg.to_bytes();
 
-        match self.transport.send(&raw, controller) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(NodeError::TransportError(e)),
-        }
+        self.transport
+            .send(&raw, controller)
+            .map_err(NodeError::TransportError)
     }
 }
 

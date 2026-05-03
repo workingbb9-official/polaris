@@ -34,6 +34,7 @@ impl DiscoveryManager {
 
     pub(crate) fn action(&mut self, now: u32) -> DiscoveryAction {
         if now.wrapping_sub(self.last_sent) >= self.send_interval {
+            self.last_sent = now;
             DiscoveryAction::Broadcast
         } else {
             DiscoveryAction::None

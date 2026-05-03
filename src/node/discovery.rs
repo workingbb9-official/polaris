@@ -12,85 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::device::DeviceId;
-use crate::protocol::DiscoveryMessage;
-use crate::transport::Transport;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiscoveryError<TE> {
-    Transport(TE),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum DiscoveryStatus<A> {
-    Broadcasted,
-    Listening,
-    Found(A),
+#[derive(Debug, PartialEq)]
+pub(crate) enum DiscoveryAction {
+    Broadcast,
+    None,
 }
 
 #[derive(Debug)]
 pub(crate) struct DiscoveryManager {
-    node_id: DeviceId,
     send_interval: u32,
     last_sent: u32,
 }
 
 impl DiscoveryManager {
-    pub(crate) fn new(node_id: DeviceId, send_interval: u32) -> Self {
+    pub(crate) fn new(send_interval: u32) -> Self {
         Self {
-            node_id,
             send_interval,
             last_sent: 0,
         }
     }
 
-    pub(crate) fn process<T: Transport>(
-        &mut self,
-        transport: &mut T,
-        now: u32,
-    ) -> Result<DiscoveryStatus<T::Addr>, DiscoveryError<T::Error>> {
+    pub(crate) fn action(&mut self, now: u32) -> DiscoveryAction {
         if now.wrapping_sub(self.last_sent) >= self.send_interval {
             self.last_sent = now;
-            match self.broadcast(transport) {
-                Ok(()) => Ok(DiscoveryStatus::Broadcasted),
-                Err(e) => Err(e),
-            }
+            DiscoveryAction::Broadcast
         } else {
-            match self.listen(transport) {
-                Ok(Some(addr)) => Ok(DiscoveryStatus::Found(addr)),
-                Ok(None) => Ok(DiscoveryStatus::Listening),
-                Err(e) => Err(e),
-            }
-        }
-    }
-
-    fn broadcast<T: Transport>(&self, transport: &mut T) -> Result<(), DiscoveryError<T::Error>> {
-        let msg = DiscoveryMessage::new_hello(self.node_id);
-        let raw = msg.to_bytes();
-
-        let addr = transport.broadcast_addr();
-
-        match transport.send(&raw, &addr) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(DiscoveryError::Transport(e)),
-        }
-    }
-
-    fn listen<T: Transport>(
-        &self,
-        transport: &mut T,
-    ) -> Result<Option<T::Addr>, DiscoveryError<T::Error>> {
-        let mut buf = [0u8; 8];
-
-        let addr = match transport.recv(&mut buf) {
-            Ok((_, addr)) => addr,
-            Err(e) => return Err(DiscoveryError::Transport(e)),
-        };
-
-        if DiscoveryMessage::from_bytes(&buf).is_none() {
-            Ok(None)
-        } else {
-            Ok(Some(addr))
+            DiscoveryAction::None
         }
     }
 }

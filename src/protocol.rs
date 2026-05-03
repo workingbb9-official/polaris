@@ -82,6 +82,10 @@ impl DataMessage {
     }
 
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf[0] != MSG_TYPE_DATA {
+            return None;
+        }
+
         if buf.len() < 4 {
             return None;
         }
@@ -162,6 +166,10 @@ impl HeartbeatMessage {
     }
 
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf[0] != MSG_TYPE_HEARTBEAT {
+            return None;
+        }
+
         if buf.len() < 3 {
             return None;
         }

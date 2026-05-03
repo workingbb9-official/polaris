@@ -103,9 +103,9 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
     pub fn process(&mut self, now: u32) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let event = self.receive()?;
 
-        if self.controller.as_ref().is_some() {
+        if let Some(addr) = self.controller {
             if self.heartbeat.action(now) == HeartbeatAction::Send {
-                self.send_heartbeat()?;
+                self.send_heartbeat(&addr)?;
             }
         } else if self.discovery.action(now) == DiscoveryAction::Broadcast {
             self.broadcast()?;
@@ -184,16 +184,12 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
             .map_err(NodeError::Transport)
     }
 
-    fn send_heartbeat(&mut self) -> Result<(), NodeError<T::Error>> {
-        let Some(controller) = self.controller.as_ref() else {
-            return Err(NodeError::NotConnected);
-        };
-
+    fn send_heartbeat(&mut self, addr: &T::Addr) -> Result<(), NodeError<T::Error>> {
         let msg = HeartbeatMessage::new(self.dev.id());
         let raw = msg.to_bytes();
 
         self.transport
-            .send(&raw, controller)
+            .send(&raw, addr)
             .map_err(NodeError::Transport)
     }
 }

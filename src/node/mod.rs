@@ -52,7 +52,7 @@ pub enum NodeError<TE> {
     NotConnected,
     /// There was an error sending or receiving over the transport. This holds the specific error
     /// from the [Transport] trait.
-    TransportError(TE),
+    Transport(TE),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a message object, or the message type was invalid for the current state.
     InvalidMessage,
@@ -114,11 +114,28 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
         Ok(event)
     }
 
+    /// Send a [DataMessage] to the controller.
+    ///
+    /// # Errors
+    /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
+    /// * `Err(NodeError::Transport(e))` - There was an error sending the data over the wire.
+    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T::Error>> {
+        let Some(controller) = self.controller.as_ref() else {
+            return Err(NodeError::NotConnected);
+        };
+
+        let raw = msg.to_bytes();
+
+        self.transport
+            .send(&raw, controller)
+            .map_err(NodeError::Transport)
+    }
+
     fn receive(&mut self) -> Result<Option<NodeEvent>, NodeError<T::Error>> {
         let mut buf = [0u8; 260];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
-            Err(e) => return Err(NodeError::TransportError(e)),
+            Err(e) => return Err(NodeError::Transport(e)),
         };
 
         if n == 0 {
@@ -164,33 +181,10 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
 
         self.transport
             .send(&raw, &addr)
-            .map_err(NodeError::TransportError)
+            .map_err(NodeError::Transport)
     }
 
-    /// Send a [DataMessage] to the controller.
-    ///
-    /// # Errors
-    /// * `Err(NodeError::NotConnected)` - There is no controller to send data to.
-    /// * `Err(NodeError::TransportError(e))` - There was an error sending the data over the wire.
-    pub fn send_data(&mut self, msg: DataMessage) -> Result<(), NodeError<T::Error>> {
-        let Some(controller) = self.controller.as_ref() else {
-            return Err(NodeError::NotConnected);
-        };
-
-        let raw = msg.to_bytes();
-
-        self.transport
-            .send(&raw, controller)
-            .map_err(NodeError::TransportError)
-    }
-
-    /// Send a heartbeat to the controller.
-    ///
-    /// # Errors
-    /// * `Err(NodeError::NotConnected)` - There is no controller to send heartbeat to.
-    /// * `Err(NodeError::TransportError(e))` - There was an error sending the heartbeat over the
-    ///   wire.
-    pub fn send_heartbeat(&mut self) -> Result<(), NodeError<T::Error>> {
+    fn send_heartbeat(&mut self) -> Result<(), NodeError<T::Error>> {
         let Some(controller) = self.controller.as_ref() else {
             return Err(NodeError::NotConnected);
         };
@@ -200,7 +194,7 @@ impl<T: Transport, A: NodeApp> Node<T, A> {
 
         self.transport
             .send(&raw, controller)
-            .map_err(NodeError::TransportError)
+            .map_err(NodeError::Transport)
     }
 }
 

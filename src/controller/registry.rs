@@ -75,7 +75,7 @@ impl<A> NodeRegistry<A> {
         Ok(())
     }
 
-    pub(crate) fn addr(&mut self, id: DeviceId) -> Result<&A, RegistryError> {
+    pub(crate) fn addr(&self, id: DeviceId) -> Result<&A, RegistryError> {
         let entry = self
             .nodes
             .get(&id)

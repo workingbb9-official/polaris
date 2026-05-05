@@ -16,7 +16,6 @@ mod registry;
 
 use registry::{NodeRegistry, RegistryError};
 
-use crate::Transport;
 use crate::device::{Device, DeviceId};
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 
@@ -33,9 +32,7 @@ pub enum ControllerEvent {
 
 /// The errors that can occur within a [Controller].
 #[derive(Debug, PartialEq)]
-pub enum ControllerError<T: Transport> {
-    /// Error sending or receiving, holds the specific error from the Transport trait.
-    Transport(T::Error),
+pub enum ControllerError {
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' object, or the message type was invalid for a controller to receive.
     InvalidMessage,
@@ -49,19 +46,17 @@ pub enum ControllerError<T: Transport> {
 /// nodes to stay simple and do their specific job. Because it is more complex, it is recommended
 /// for a Controller to be a device that has more resources in order to stay responsive while
 /// maintaining the coordination of the nodes.
-pub struct Controller<T: Transport> {
+pub struct Controller<A> {
     dev: Device,
-    registry: NodeRegistry<T::Addr>,
-    transport: T,
+    registry: NodeRegistry<A>,
 }
 
-impl<T: Transport> Controller<T> {
+impl<A> Controller<A> {
     /// Create a new controller.
-    pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
+    pub fn new(dev: Device, max_nodes: usize) -> Self {
         Self {
             dev,
             registry: NodeRegistry::new(max_nodes),
-            transport,
         }
     }
 
@@ -71,25 +66,11 @@ impl<T: Transport> Controller<T> {
         self.dev
     }
 
-    pub fn receive(&mut self) -> Result<Option<ControllerEvent>, ControllerError<T>> {
-        let mut buf = [0u8; 1024];
-        let (n, addr) = match self.transport.recv(&mut buf) {
-            Ok((n, addr)) => (n, addr),
-            Err(e) => return Err(ControllerError::Transport(e)),
-        };
-
-        if n == 0 {
-            return Ok(None);
-        }
-
-        self.handle_msg(&buf, addr)
-    }
-
-    fn handle_msg(
+    pub fn process_msg(
         &mut self,
         buf: &[u8],
-        addr: T::Addr,
-    ) -> Result<Option<ControllerEvent>, ControllerError<T>> {
+        addr: A,
+    ) -> Result<Option<ControllerEvent>, ControllerError> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
                 if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(buf) {
@@ -120,22 +101,8 @@ impl<T: Transport> Controller<T> {
         }
     }
 
-    /// Send a [DataMessage] to a node.
-    ///
-    /// # Errors
-    /// * `Err(ControllerError::DeviceNotRegistered) - The [DeviceId] of the node is not within the
-    ///   registry.
-    /// * `Err(ControllerError::Transport(e)) - There was an error sending the data over the
-    ///   wire.
-    pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
-        let addr = self
-            .registry
-            .addr(node_id)
-            .map_err(ControllerError::Registry)?;
-        let raw = msg.to_bytes();
-
-        self.transport
-            .send(&raw, addr)
-            .map_err(ControllerError::Transport)
+    #[inline]
+    pub fn addr(&self, id: DeviceId) -> Result<&A, ControllerError> {
+        self.registry.addr(id).map_err(ControllerError::Registry)
     }
 }

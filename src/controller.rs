@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::time::Instant;
+mod registry;
+
+use registry::{NodeRegistry, RegistryError};
 
 use crate::Transport;
 use crate::device::{Device, DeviceId};
@@ -31,25 +32,15 @@ pub enum ControllerEvent {
 }
 
 /// The errors that can occur within a [Controller].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum ControllerError<T: Transport> {
-    /// Used on discovery to represent that the DeviceId given is already in use by a stored node or
-    /// the controller itself.
-    DeviceIdInUse,
     /// Error sending or receiving, holds the specific error from the Transport trait.
-    TransportError(T::Error),
+    Transport(T::Error),
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' object, or the message type was invalid for a controller to receive.
     InvalidMessage,
-    /// The [DeviceId] received was not found within the Controller registry.
-    DeviceNotRegistered,
-    /// The amount of nodes in the registry has reached 'max_nodes', no more can be added.
-    MaxNodesReached,
-}
-
-struct NodeEntry<N> {
-    addr: N,
-    last_seen: Instant,
+    /// There was an error within the registry. Error is held and propagated.
+    Registry(RegistryError),
 }
 
 /// The main orchestrator of the system.
@@ -60,8 +51,7 @@ struct NodeEntry<N> {
 /// maintaining the coordination of the nodes.
 pub struct Controller<T: Transport> {
     dev: Device,
-    registry: HashMap<DeviceId, NodeEntry<T::Addr>>,
-    max_nodes: usize,
+    registry: NodeRegistry<T::Addr>,
     transport: T,
 }
 
@@ -70,51 +60,22 @@ impl<T: Transport> Controller<T> {
     pub fn new(dev: Device, max_nodes: usize, transport: T) -> Self {
         Self {
             dev,
-            registry: HashMap::new(),
-            max_nodes,
+            registry: NodeRegistry::new(max_nodes),
             transport,
         }
     }
 
     /// Extract the [Device] of the controller.
+    #[inline]
     pub fn dev(&self) -> Device {
         self.dev
-    }
-
-    /// Access the last time a node was seen.
-    ///
-    /// # Errors
-    /// * `Err(ControllerError::DeviceNotRegistered)` - The [DeviceId] was not found in the registry.
-    pub fn last_seen(&self, id: DeviceId) -> Result<Instant, ControllerError<T>> {
-        match self.registry.get(&id) {
-            Some(entry) => Ok(entry.last_seen),
-            None => Err(ControllerError::DeviceNotRegistered),
-        }
-    }
-
-    fn add_node(&mut self, id: DeviceId, addr: T::Addr) -> Result<(), ControllerError<T>> {
-        if self.registry.contains_key(&id) || self.dev.id() == id {
-            return Err(ControllerError::DeviceIdInUse);
-        }
-
-        if self.registry.len() >= self.max_nodes {
-            return Err(ControllerError::MaxNodesReached);
-        }
-
-        let node = NodeEntry {
-            addr,
-            last_seen: Instant::now(),
-        };
-        self.registry.insert(id, node);
-
-        Ok(())
     }
 
     pub fn receive(&mut self) -> Result<Option<ControllerEvent>, ControllerError<T>> {
         let mut buf = [0u8; 1024];
         let (n, addr) = match self.transport.recv(&mut buf) {
             Ok((n, addr)) => (n, addr),
-            Err(e) => return Err(ControllerError::TransportError(e)),
+            Err(e) => return Err(ControllerError::Transport(e)),
         };
 
         if n == 0 {
@@ -132,7 +93,9 @@ impl<T: Transport> Controller<T> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
                 if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(buf) {
-                    self.add_node(node_id, addr)?;
+                    self.registry
+                        .add_node(node_id, addr)
+                        .map_err(ControllerError::Registry)?;
                     Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
                 } else {
                     Err(ControllerError::InvalidMessage)
@@ -148,12 +111,10 @@ impl<T: Transport> Controller<T> {
                     HeartbeatMessage::from_bytes(buf).ok_or(ControllerError::InvalidMessage)?;
 
                 let node_id = msg.from();
-                if let Some(entry) = self.registry.get_mut(&node_id) {
-                    entry.last_seen = Instant::now();
-                    Ok(None)
-                } else {
-                    Err(ControllerError::DeviceNotRegistered)
-                }
+                self.registry
+                    .update_node(node_id)
+                    .map_err(ControllerError::Registry)?;
+                Ok(None)
             }
             Some(MessageType::Welcome) | None => Err(ControllerError::InvalidMessage),
         }
@@ -164,35 +125,33 @@ impl<T: Transport> Controller<T> {
     /// # Errors
     /// * `Err(ControllerError::DeviceNotRegistered) - The [DeviceId] of the node is not within the
     ///   registry.
-    /// * `Err(ControllerError::TransportError(e)) - There was an error sending the data over the
+    /// * `Err(ControllerError::Transport(e)) - There was an error sending the data over the
     ///   wire.
     pub fn send(&mut self, msg: DataMessage, node_id: DeviceId) -> Result<(), ControllerError<T>> {
-        let addr = match self.registry.get(&node_id) {
-            Some(entry) => &entry.addr,
-            None => return Err(ControllerError::DeviceNotRegistered),
-        };
-
+        let addr = self
+            .registry
+            .addr(node_id)
+            .map_err(ControllerError::Registry)?;
         let raw = msg.to_bytes();
 
-        match self.transport.send(&raw, addr) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(ControllerError::TransportError(e)),
-        }
+        self.transport
+            .send(&raw, addr)
+            .map_err(ControllerError::Transport)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::DeviceType;
+    use crate::device::{DeviceId, DeviceType};
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     struct MockAddr {
         pub octets: [u8; 4],
         pub port: u16,
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, PartialEq)]
     struct MockTransport;
     impl Transport for MockTransport {
         type Addr = MockAddr;
@@ -224,7 +183,7 @@ mod tests {
         let mut con = Controller::new(dev, max_nodes, MockTransport);
 
         let addr = new_mock_addr();
-        con.add_node(DeviceId::new(11), addr).unwrap();
+        con.registry.add_node(DeviceId::new(11), addr).unwrap();
 
         con
     }
@@ -241,7 +200,6 @@ mod tests {
             ret,
             Ok(Some(ControllerEvent::NodeDiscovered(DeviceId::new(13))))
         );
-        assert_eq!(con.registry.contains_key(&DeviceId::new(13)), true);
     }
 
     #[test]
@@ -264,24 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_heartbeat() {
-        let mut con = new_mock_controller(7);
-        let msg = HeartbeatMessage::new(DeviceId::new(11));
-        let raw = msg.to_bytes();
-        let addr = new_mock_addr();
-        let start_time = Instant::now();
-
-        let ret = con.handle_msg(&raw, addr);
-        assert_eq!(ret, Ok(None));
-
-        let seen = con.last_seen(DeviceId::new(11)).unwrap();
-        assert!(seen >= start_time);
-
-        let now = Instant::now();
-        assert!(seen <= now);
-    }
-
-    #[test]
     fn test_send_data() {
         let mut con = new_mock_controller(7);
         let msg = DataMessage::new(DeviceId::new(10), b"hello");
@@ -296,6 +236,9 @@ mod tests {
         let msg = DataMessage::new(DeviceId::new(10), b"hello");
 
         let ret = con.send(msg, DeviceId::new(5));
-        assert_eq!(ret, Err(ControllerError::DeviceNotRegistered));
+        assert_eq!(
+            ret,
+            Err(ControllerError::Registry(RegistryError::NodeNotRegistered))
+        );
     }
 }

@@ -22,9 +22,10 @@ use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageTy
 /// The significant events that can occur within a [Controller].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControllerEvent<'a> {
-    /// The controller has received data from a node. The buffer returned is the exact data slice,
-    /// removing all the headers and giving the data up to length specified by the packet.
-    DataReceived(&'a [u8]),
+    /// The controller has received data from a node. From is used to identify the [Device] that
+    /// sent the message. The buffer returned is the exact data slice, with no headers and the exact
+    /// length specified by the packet.
+    DataReceived { from: DeviceId, data: &'a [u8] },
     /// A node has been discovered and added to the registry. Store this [DeviceId], because the
     /// controller will return this for context on which device has sent data.
     NodeDiscovered(DeviceId),
@@ -85,8 +86,12 @@ impl<Addr> Controller<Addr> {
             Some(MessageType::Data) => {
                 DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
                 let len = raw[3];
+                let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
 
-                Ok(Some(ControllerEvent::DataReceived(&raw[3..len as usize])))
+                Ok(Some(ControllerEvent::DataReceived {
+                    from,
+                    data: &raw[3..len as usize],
+                }))
             }
             Some(MessageType::Heartbeat) => {
                 let msg =

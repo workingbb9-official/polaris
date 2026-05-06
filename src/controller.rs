@@ -21,10 +21,10 @@ use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageTy
 
 /// The significant events that can occur within a [Controller].
 #[derive(Debug, PartialEq, Eq)]
-pub enum ControllerEvent {
-    /// The controller has received data from a node. Use the [DataMessage] method `.from()` to
-    /// determine the identity of the node.
-    DataReceived(Box<DataMessage>),
+pub enum ControllerEvent<'a> {
+    /// The controller has received data from a node. The buffer returned is the exact data slice,
+    /// removing all the headers and giving the data up to length specified by the packet.
+    DataReceived(&'a [u8]),
     /// A node has been discovered and added to the registry. Store this [DeviceId], because the
     /// controller will return this for context on which device has sent data.
     NodeDiscovered(DeviceId),
@@ -66,14 +66,14 @@ impl<Addr> Controller<Addr> {
         self.dev
     }
 
-    pub fn process_msg(
+    pub fn process_msg<'a>(
         &mut self,
-        buf: &[u8],
+        raw: &'a mut [u8],
         addr: Addr,
-    ) -> Result<Option<ControllerEvent>, ControllerError> {
-        match MessageType::from_buf(buf) {
+    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+        match MessageType::from_buf(raw) {
             Some(MessageType::Hello) => {
-                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(buf) {
+                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
                     self.registry
                         .add_node(node_id, addr)
                         .map_err(ControllerError::Registry)?;
@@ -83,13 +83,14 @@ impl<Addr> Controller<Addr> {
                 }
             }
             Some(MessageType::Data) => {
-                let msg = DataMessage::from_bytes(buf).ok_or(ControllerError::InvalidMessage)?;
+                DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
+                let len = raw[3];
 
-                Ok(Some(ControllerEvent::DataReceived(Box::new(msg))))
+                Ok(Some(ControllerEvent::DataReceived(&raw[3..len as usize])))
             }
             Some(MessageType::Heartbeat) => {
                 let msg =
-                    HeartbeatMessage::from_bytes(buf).ok_or(ControllerError::InvalidMessage)?;
+                    HeartbeatMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
 
                 let node_id = msg.from();
                 self.registry

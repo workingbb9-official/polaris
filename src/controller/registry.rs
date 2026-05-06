@@ -29,18 +29,18 @@ pub enum RegistryError {
 }
 
 #[derive(Debug, PartialEq)]
-struct NodeEntry<A> {
-    addr: A,
+struct NodeEntry<Addr> {
+    addr: Addr,
     seen: Instant,
 }
 
 #[derive(Debug)]
-pub(crate) struct NodeRegistry<A> {
-    nodes: HashMap<DeviceId, NodeEntry<A>>,
+pub(crate) struct NodeRegistry<Addr> {
+    nodes: HashMap<DeviceId, NodeEntry<Addr>>,
     max_nodes: usize,
 }
 
-impl<A> NodeRegistry<A> {
+impl<Addr> NodeRegistry<Addr> {
     pub(crate) fn new(max_nodes: usize) -> Self {
         Self {
             nodes: HashMap::new(),
@@ -48,7 +48,7 @@ impl<A> NodeRegistry<A> {
         }
     }
 
-    pub(crate) fn add_node(&mut self, id: DeviceId, addr: A) -> Result<(), RegistryError> {
+    pub(crate) fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), RegistryError> {
         if self.nodes.contains_key(&id) {
             return Err(RegistryError::DeviceIdInUse);
         }
@@ -75,7 +75,7 @@ impl<A> NodeRegistry<A> {
         Ok(())
     }
 
-    pub(crate) fn addr(&mut self, id: DeviceId) -> Result<&A, RegistryError> {
+    pub(crate) fn addr(&self, id: DeviceId) -> Result<&Addr, RegistryError> {
         let entry = self
             .nodes
             .get(&id)

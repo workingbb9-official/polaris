@@ -46,12 +46,12 @@ pub enum ControllerError {
 /// nodes to stay simple and do their specific job. Because it is more complex, it is recommended
 /// for a Controller to be a device that has more resources in order to stay responsive while
 /// maintaining the coordination of the nodes.
-pub struct Controller<A> {
+pub struct Controller<Addr> {
     dev: Device,
-    registry: NodeRegistry<A>,
+    registry: NodeRegistry<Addr>,
 }
 
-impl<A> Controller<A> {
+impl<Addr> Controller<Addr> {
     /// Create a new controller.
     pub fn new(dev: Device, max_nodes: usize) -> Self {
         Self {
@@ -69,7 +69,7 @@ impl<A> Controller<A> {
     pub fn process_msg(
         &mut self,
         buf: &[u8],
-        addr: A,
+        addr: Addr,
     ) -> Result<Option<ControllerEvent>, ControllerError> {
         match MessageType::from_buf(buf) {
             Some(MessageType::Hello) => {
@@ -102,7 +102,7 @@ impl<A> Controller<A> {
     }
 
     #[inline]
-    pub fn addr(&self, id: DeviceId) -> Result<&A, ControllerError> {
+    pub fn addr(&self, id: DeviceId) -> Result<&Addr, ControllerError> {
         self.registry.addr(id).map_err(ControllerError::Registry)
     }
 }

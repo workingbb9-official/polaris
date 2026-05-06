@@ -46,7 +46,11 @@ pub enum NodeEvent {
 
 #[derive(Debug)]
 pub enum NodeAction<Addr> {
+    /// Send out a [HeartbeatMessage] to the controller. This ensures that the controller remains
+    /// connected to the node.
     SendHeartbeat { addr: Addr, msg: [u8; 3] },
+    /// Send out a [DiscoveryMessage]. This should be sent over a broadcast address, so that any
+    /// potential controllers can see it.
     SendDiscovery { msg: [u8; 3] },
 }
 
@@ -94,6 +98,7 @@ impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
         self.dev
     }
 
+    /// Return an optional action to take based on current state.
     pub fn action(&mut self, now: u32) -> Option<NodeAction<Addr>> {
         if let Some(addr) = self.controller {
             if self.heartbeat.action(now) == HeartbeatAction::Send {

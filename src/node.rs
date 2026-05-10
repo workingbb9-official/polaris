@@ -24,24 +24,16 @@ use heartbeat::HeartbeatManager;
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage};
 
-/// The core interface for [Node] logic.
-pub trait NodeApp {
-    /// Called when a [DataMessage] is received.
-    fn on_data(&mut self, data: &[u8]);
-    /// Called when a welcome message is received during discovery phase, and the node is not
-    /// already connected to a controller.
-    fn on_connection(&mut self);
-}
-
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
-pub enum NodeEvent {
+pub enum NodeEvent<'a> {
     /// The node has connected to a controller. This enables the sending and receiving of data from
     /// the controller.
     ControllerConnected,
-    /// The controller has sent a [DataMessage]. The node will pass the data onto the injected
-    /// handler. This event is a notification, the data has already been addressed.
-    DataReceived,
+    /// The node has received data from a controller. The buffer returned is a slice of the raw
+    /// packet, removing the headers and extracting the data up to the length specified by the
+    /// packet header.
+    DataReceived { data: &'a [u8] },
 }
 
 #[derive(Debug)]
@@ -72,23 +64,21 @@ pub enum NodeError {
 /// Nodes will remain simple and able to represent any type of device. They can be anything that
 /// operates independently and sends information to a controller.
 #[derive(Debug)]
-pub struct Node<Addr, App: NodeApp> {
+pub struct Node<Addr> {
     dev: Device,
     controller: Option<Addr>,
     discovery: DiscoveryManager,
     heartbeat: HeartbeatManager,
-    app: App,
 }
 
-impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
+impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32, app: App) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32) -> Self {
         Self {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(discovery_interval),
             heartbeat: HeartbeatManager::new(heartbeat_interval),
-            app,
         }
     }
 
@@ -118,31 +108,24 @@ impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
     }
 
     /// Process a packet and return event.
-    ///
-    /// # Errors
-    /// * `Err(NodeError::WrongController)` - Received a packet from a different address.
-    /// * `Err(NodeError::InvalidMessage)` - The message received was invalid. This could be due to
-    ///   an incorrect format, or a wrong packet type for the current Node state.
-    pub fn process_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError> {
+    pub fn process_msg<'a>(
+        &mut self,
+        raw: &'a [u8],
+        addr: Addr,
+    ) -> Result<Option<NodeEvent<'a>>, NodeError> {
         if let Some(con_addr) = self.controller.as_ref() {
             if addr != *con_addr {
                 return Err(NodeError::WrongController);
             }
 
-            if let Some(msg) = DataMessage::from_bytes(buf) {
-                self.app.on_data(msg.payload());
-            } else {
-                return Err(NodeError::InvalidMessage);
-            }
-
-            Ok(Some(NodeEvent::DataReceived))
+            DataMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            let len = raw[3];
+            Ok(Some(NodeEvent::DataReceived {
+                data: &raw[3..len as usize],
+            }))
         } else {
-            if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
-                self.controller = Some(addr);
-                self.app.on_connection();
-            } else {
-                return Err(NodeError::InvalidMessage);
-            }
+            DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            self.controller = Some(addr);
 
             Ok(Some(NodeEvent::ControllerConnected))
         }

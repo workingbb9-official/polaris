@@ -30,9 +30,9 @@ pub enum NodeEvent<'a> {
     /// The node has connected to a controller. This enables the sending and receiving of data from
     /// the controller.
     ControllerConnected,
-    /// The node has received data from the controller. From is used to identify the [Device] that
-    /// sent the message. The buffer returned is the exact data slice, with no headers and the exact
-    /// length specified by the packet.
+    /// The node has received data from a controller. The buffer returned is a slice of the raw
+    /// packet, removing the headers and extracting the data up to the length specified by the
+    /// packet header.
     DataReceived { data: &'a [u8] },
 }
 

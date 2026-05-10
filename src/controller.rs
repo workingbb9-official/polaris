@@ -23,8 +23,8 @@ use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageTy
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControllerEvent<'a> {
     /// The controller has received data from a node. From is used to identify the [Device] that
-    /// sent the message. The buffer returned is the exact data slice, with no headers and the exact
-    /// length specified by the packet.
+    /// sent the message. The buffer returned is a slice of the raw packet, removing the headers
+    /// and extracting the data up to the length specified by the packet header.
     DataReceived { from: DeviceId, data: &'a [u8] },
     /// A node has been discovered and added to the registry. Store this [DeviceId], because the
     /// controller will return this for context on which device has sent data.

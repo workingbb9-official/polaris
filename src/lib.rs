@@ -19,5 +19,5 @@ mod protocol;
 
 pub use controller::Controller;
 pub use device::{Device, DeviceId, DeviceType};
-pub use node::{Node, NodeApp, NodeError, NodeEvent};
+pub use node::{Node, NodeError, NodeEvent};
 pub use protocol::DataMessage;

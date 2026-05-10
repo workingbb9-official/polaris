@@ -24,15 +24,6 @@ use heartbeat::HeartbeatManager;
 use crate::device::Device;
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage};
 
-/// The core interface for [Node] logic.
-pub trait NodeApp {
-    /// Called when a [DataMessage] is received.
-    fn on_data(&mut self, data: &[u8]);
-    /// Called when a welcome message is received during discovery phase, and the node is not
-    /// already connected to a controller.
-    fn on_connection(&mut self);
-}
-
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
 pub enum NodeEvent<'a> {
@@ -73,23 +64,21 @@ pub enum NodeError {
 /// Nodes will remain simple and able to represent any type of device. They can be anything that
 /// operates independently and sends information to a controller.
 #[derive(Debug)]
-pub struct Node<Addr, App: NodeApp> {
+pub struct Node<Addr> {
     dev: Device,
     controller: Option<Addr>,
     discovery: DiscoveryManager,
     heartbeat: HeartbeatManager,
-    app: App,
 }
 
-impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
+impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32, app: App) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32) -> Self {
         Self {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(discovery_interval),
             heartbeat: HeartbeatManager::new(heartbeat_interval),
-            app,
         }
     }
 
@@ -137,7 +126,6 @@ impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
         } else {
             DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
             self.controller = Some(addr);
-            self.app.on_connection();
 
             Ok(Some(NodeEvent::ControllerConnected))
         }

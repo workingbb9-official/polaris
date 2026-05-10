@@ -35,13 +35,14 @@ pub trait NodeApp {
 
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
-pub enum NodeEvent {
+pub enum NodeEvent<'a> {
     /// The node has connected to a controller. This enables the sending and receiving of data from
     /// the controller.
     ControllerConnected,
-    /// The controller has sent a [DataMessage]. The node will pass the data onto the injected
-    /// handler. This event is a notification, the data has already been addressed.
-    DataReceived,
+    /// The node has received data from the controller. From is used to identify the [Device] that
+    /// sent the message. The buffer returned is the exact data slice, with no headers and the exact
+    /// length specified by the packet.
+    DataReceived { data: &'a [u8] },
 }
 
 #[derive(Debug)]
@@ -118,31 +119,25 @@ impl<Addr: Copy + std::cmp::PartialEq, App: NodeApp> Node<Addr, App> {
     }
 
     /// Process a packet and return event.
-    ///
-    /// # Errors
-    /// * `Err(NodeError::WrongController)` - Received a packet from a different address.
-    /// * `Err(NodeError::InvalidMessage)` - The message received was invalid. This could be due to
-    ///   an incorrect format, or a wrong packet type for the current Node state.
-    pub fn process_msg(&mut self, buf: &[u8], addr: Addr) -> Result<Option<NodeEvent>, NodeError> {
+    pub fn process_msg<'a>(
+        &mut self,
+        raw: &'a [u8],
+        addr: Addr,
+    ) -> Result<Option<NodeEvent<'a>>, NodeError> {
         if let Some(con_addr) = self.controller.as_ref() {
             if addr != *con_addr {
                 return Err(NodeError::WrongController);
             }
 
-            if let Some(msg) = DataMessage::from_bytes(buf) {
-                self.app.on_data(msg.payload());
-            } else {
-                return Err(NodeError::InvalidMessage);
-            }
-
-            Ok(Some(NodeEvent::DataReceived))
+            DataMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            let len = raw[3];
+            Ok(Some(NodeEvent::DataReceived {
+                data: &raw[3..len as usize],
+            }))
         } else {
-            if let Some(DiscoveryMessage::Welcome) = DiscoveryMessage::from_bytes(buf) {
-                self.controller = Some(addr);
-                self.app.on_connection();
-            } else {
-                return Err(NodeError::InvalidMessage);
-            }
+            DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            self.controller = Some(addr);
+            self.app.on_connection();
 
             Ok(Some(NodeEvent::ControllerConnected))
         }

@@ -34,10 +34,14 @@ impl HeartbeatManager {
 
     pub(crate) fn action(&mut self, now: u32) -> HeartbeatAction {
         if now.wrapping_sub(self.last_sent) >= self.send_interval {
-            self.last_sent = now;
             HeartbeatAction::Send
         } else {
             HeartbeatAction::None
         }
+    }
+
+    #[inline]
+    pub(crate) fn reset(&mut self, now: u32) {
+        self.last_sent = now;
     }
 }

@@ -88,6 +88,10 @@ impl<Addr> Controller<Addr> {
                 let len = raw[3];
                 let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
 
+                self.registry
+                    .update_node(from)
+                    .map_err(ControllerError::Registry)?;
+
                 Ok(Some(ControllerEvent::DataReceived {
                     from,
                     data: &raw[3..len as usize],

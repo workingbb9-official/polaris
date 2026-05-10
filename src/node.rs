@@ -130,4 +130,12 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
             Ok(Some(NodeEvent::ControllerConnected))
         }
     }
+
+    /// Reset the heartbeat timer.
+    ///
+    /// Call this when either a heartbeat message or a [DataMessage] is sent.
+    #[inline]
+    pub fn reset_heartbeat(&mut self, now: u32) {
+        self.heartbeat.reset(now);
+    }
 }

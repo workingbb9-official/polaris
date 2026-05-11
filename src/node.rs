@@ -112,6 +112,7 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
         &mut self,
         raw: &'a [u8],
         addr: Addr,
+        now: u32,
     ) -> Result<Option<NodeEvent<'a>>, NodeError> {
         if let Some(con_addr) = self.controller.as_ref() {
             if addr != *con_addr {
@@ -126,6 +127,7 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
         } else {
             DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
             self.controller = Some(addr);
+            self.heartbeat.reset(now);
 
             Ok(Some(NodeEvent::ControllerConnected))
         }

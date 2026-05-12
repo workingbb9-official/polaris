@@ -140,4 +140,12 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
     pub fn reset_heartbeat(&mut self, now: u32) {
         self.heartbeat.reset(now);
     }
+
+    /// Reset the discovery timer.
+    ///
+    /// Call this when a discovery message is sent.
+    #[inline]
+    pub fn reset_discovery(&mut self, now: u32) {
+        self.discovery.reset(now);
+    }
 }

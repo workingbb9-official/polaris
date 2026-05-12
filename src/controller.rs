@@ -21,11 +21,14 @@ use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageTy
 
 /// The significant events that can occur within a [Controller].
 #[derive(Debug, PartialEq, Eq)]
-pub enum ControllerEvent<'a> {
-    /// The controller has received data from a node. From is used to identify the [Device] that
-    /// sent the message. The buffer returned is a slice of the raw packet, removing the headers
-    /// and extracting the data up to the length specified by the packet header.
-    DataReceived { from: DeviceId, data: &'a [u8] },
+pub enum ControllerEvent {
+    /// The controller has received data from a node. 'from' is used to identify the [Device] that
+    /// sent the message. 'range' contains the starting and ending index of the raw data, without
+    /// the headers and up to the length specified by the packet.
+    DataReceived {
+        from: DeviceId,
+        range: core::ops::Range<usize>,
+    },
     /// A node has been discovered and added to the registry. Store this [DeviceId], because the
     /// controller will return this for context on which device has sent data.
     NodeDiscovered(DeviceId),
@@ -67,11 +70,11 @@ impl<Addr> Controller<Addr> {
         self.dev
     }
 
-    pub fn process_msg<'a>(
+    pub fn process_msg(
         &mut self,
-        raw: &'a mut [u8],
+        raw: &mut [u8],
         addr: Addr,
-    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+    ) -> Result<Option<ControllerEvent>, ControllerError> {
         match MessageType::from_buf(raw) {
             Some(MessageType::Hello) => self.process_hello(raw, addr),
             Some(MessageType::Data) => self.process_data(raw),
@@ -85,11 +88,11 @@ impl<Addr> Controller<Addr> {
         self.registry.addr(id).map_err(ControllerError::Registry)
     }
 
-    fn process_hello<'a>(
+    fn process_hello(
         &mut self,
         raw: &mut [u8],
         addr: Addr,
-    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+    ) -> Result<Option<ControllerEvent>, ControllerError> {
         if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
             self.registry
                 .add_node(node_id, addr)
@@ -100,10 +103,7 @@ impl<Addr> Controller<Addr> {
         }
     }
 
-    fn process_data<'a>(
-        &mut self,
-        raw: &'a mut [u8],
-    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+    fn process_data(&mut self, raw: &mut [u8]) -> Result<Option<ControllerEvent>, ControllerError> {
         DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
         let len = raw[3];
         let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
@@ -114,14 +114,14 @@ impl<Addr> Controller<Addr> {
 
         Ok(Some(ControllerEvent::DataReceived {
             from,
-            data: &raw[3..len as usize],
+            range: 3..len as usize,
         }))
     }
 
-    fn process_heartbeat<'a>(
+    fn process_heartbeat(
         &mut self,
         raw: &mut [u8],
-    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+    ) -> Result<Option<ControllerEvent>, ControllerError> {
         let msg = HeartbeatMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
 
         let node_id = msg.from();

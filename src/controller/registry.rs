@@ -37,6 +37,7 @@ struct NodeEntry<Addr> {
 #[derive(Debug)]
 pub(crate) struct NodeRegistry<Addr> {
     nodes: HashMap<DeviceId, NodeEntry<Addr>>,
+    pending: HashMap<DeviceId, NodeEntry<Addr>>,
     max_nodes: usize,
 }
 
@@ -44,6 +45,7 @@ impl<Addr> NodeRegistry<Addr> {
     pub(crate) fn new(max_nodes: usize) -> Self {
         Self {
             nodes: HashMap::new(),
+            pending: HashMap::new(),
             max_nodes,
         }
     }
@@ -81,5 +83,24 @@ impl<Addr> NodeRegistry<Addr> {
             .get(&id)
             .ok_or(RegistryError::NodeNotRegistered)?;
         Ok(&entry.addr)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn add_pending(&mut self, id: DeviceId, addr: Addr) -> Result<(), RegistryError> {
+        if self.nodes.contains_key(&id) || self.pending.contains_key(&id) {
+            return Err(RegistryError::DeviceIdInUse);
+        }
+
+        if self.nodes.len() + self.pending.len() >= self.max_nodes {
+            return Err(RegistryError::MaxNodesReached);
+        }
+
+        let node = NodeEntry {
+            addr,
+            seen: Instant::now(),
+        };
+
+        self.pending.insert(id, node);
+        Ok(())
     }
 }

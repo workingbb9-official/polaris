@@ -19,6 +19,8 @@ use registry::{NodeRegistry, RegistryError};
 use crate::device::{Device, DeviceId};
 use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 
+type ControllerResult = Result<Option<ControllerEvent>, ControllerError>;
+
 /// The significant events that can occur within a [Controller].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControllerEvent {
@@ -88,11 +90,7 @@ impl<Addr> Controller<Addr> {
         self.registry.addr(id).map_err(ControllerError::Registry)
     }
 
-    fn process_hello(
-        &mut self,
-        raw: &mut [u8],
-        addr: Addr,
-    ) -> Result<Option<ControllerEvent>, ControllerError> {
+    fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> ControllerResult {
         if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
             self.registry
                 .add_node(node_id, addr)
@@ -103,7 +101,7 @@ impl<Addr> Controller<Addr> {
         }
     }
 
-    fn process_data(&mut self, raw: &mut [u8]) -> Result<Option<ControllerEvent>, ControllerError> {
+    fn process_data(&mut self, raw: &mut [u8]) -> ControllerResult {
         DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
         let len = raw[3];
         let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
@@ -118,10 +116,7 @@ impl<Addr> Controller<Addr> {
         }))
     }
 
-    fn process_heartbeat(
-        &mut self,
-        raw: &mut [u8],
-    ) -> Result<Option<ControllerEvent>, ControllerError> {
+    fn process_heartbeat(&mut self, raw: &mut [u8]) -> ControllerResult {
         let msg = HeartbeatMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
 
         let node_id = msg.from();

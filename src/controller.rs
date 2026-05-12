@@ -73,40 +73,9 @@ impl<Addr> Controller<Addr> {
         addr: Addr,
     ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
         match MessageType::from_buf(raw) {
-            Some(MessageType::Hello) => {
-                if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
-                    self.registry
-                        .add_node(node_id, addr)
-                        .map_err(ControllerError::Registry)?;
-                    Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
-                } else {
-                    Err(ControllerError::InvalidMessage)
-                }
-            }
-            Some(MessageType::Data) => {
-                DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
-                let len = raw[3];
-                let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
-
-                self.registry
-                    .update_node(from)
-                    .map_err(ControllerError::Registry)?;
-
-                Ok(Some(ControllerEvent::DataReceived {
-                    from,
-                    data: &raw[3..len as usize],
-                }))
-            }
-            Some(MessageType::Heartbeat) => {
-                let msg =
-                    HeartbeatMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
-
-                let node_id = msg.from();
-                self.registry
-                    .update_node(node_id)
-                    .map_err(ControllerError::Registry)?;
-                Ok(None)
-            }
+            Some(MessageType::Hello) => self.process_hello(raw, addr),
+            Some(MessageType::Data) => self.process_data(raw),
+            Some(MessageType::Heartbeat) => self.process_heartbeat(raw),
             Some(MessageType::Welcome) | None => Err(ControllerError::InvalidMessage),
         }
     }
@@ -114,5 +83,51 @@ impl<Addr> Controller<Addr> {
     #[inline]
     pub fn addr(&self, id: DeviceId) -> Result<&Addr, ControllerError> {
         self.registry.addr(id).map_err(ControllerError::Registry)
+    }
+
+    fn process_hello<'a>(
+        &mut self,
+        raw: &mut [u8],
+        addr: Addr,
+    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+        if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
+            self.registry
+                .add_node(node_id, addr)
+                .map_err(ControllerError::Registry)?;
+            Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
+        } else {
+            Err(ControllerError::InvalidMessage)
+        }
+    }
+
+    fn process_data<'a>(
+        &mut self,
+        raw: &'a mut [u8],
+    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+        DataMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
+        let len = raw[3];
+        let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
+
+        self.registry
+            .update_node(from)
+            .map_err(ControllerError::Registry)?;
+
+        Ok(Some(ControllerEvent::DataReceived {
+            from,
+            data: &raw[3..len as usize],
+        }))
+    }
+
+    fn process_heartbeat<'a>(
+        &mut self,
+        raw: &mut [u8],
+    ) -> Result<Option<ControllerEvent<'a>>, ControllerError> {
+        let msg = HeartbeatMessage::from_bytes(raw).ok_or(ControllerError::InvalidMessage)?;
+
+        let node_id = msg.from();
+        self.registry
+            .update_node(node_id)
+            .map_err(ControllerError::Registry)?;
+        Ok(None)
     }
 }

@@ -86,14 +86,24 @@ impl<Addr> Controller<Addr> {
     }
 
     #[inline]
+    /// Get the network address of a node.
     pub fn addr(&self, id: DeviceId) -> Result<&Addr, ControllerError> {
         self.registry.addr(id).map_err(ControllerError::Registry)
+    }
+
+    /// Authorize a pending node.
+    #[inline]
+    pub fn authorize(&mut self, id: DeviceId) -> Result<(), ControllerError> {
+        self.registry
+            .add_node(id)
+            .map_err(ControllerError::Registry)?;
+        Ok(())
     }
 
     fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> ControllerResult {
         if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
             self.registry
-                .add_node(node_id, addr)
+                .add_pending(node_id, addr)
                 .map_err(ControllerError::Registry)?;
             Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
         } else {

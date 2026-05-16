@@ -50,7 +50,7 @@ impl<Addr> NodeRegistry<Addr> {
         }
     }
 
-    pub(crate) fn add_node(&mut self, id: DeviceId, addr: Addr) -> Result<(), RegistryError> {
+    pub(crate) fn add_node(&mut self, id: DeviceId) -> Result<(), RegistryError> {
         if self.nodes.contains_key(&id) {
             return Err(RegistryError::DeviceIdInUse);
         }
@@ -59,12 +59,12 @@ impl<Addr> NodeRegistry<Addr> {
             return Err(RegistryError::MaxNodesReached);
         }
 
-        let node = NodeEntry {
-            addr,
-            seen: Instant::now(),
-        };
+        if let Some(pending) = self.pending.remove(&id) {
+            self.nodes.insert(id, pending);
+        } else {
+            return Err(RegistryError::NodeNotRegistered);
+        }
 
-        self.nodes.insert(id, node);
         Ok(())
     }
 
@@ -85,7 +85,6 @@ impl<Addr> NodeRegistry<Addr> {
         Ok(&entry.addr)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn add_pending(&mut self, id: DeviceId, addr: Addr) -> Result<(), RegistryError> {
         if self.nodes.contains_key(&id) || self.pending.contains_key(&id) {
             return Err(RegistryError::DeviceIdInUse);

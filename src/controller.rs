@@ -120,9 +120,10 @@ impl<Addr> Controller<Addr> {
             .update_node(from)
             .map_err(ControllerError::Registry)?;
 
+        let end = len + 4;
         Ok(Some(ControllerEvent::DataReceived {
             from,
-            range: 3..len as usize,
+            range: 4..end as usize,
         }))
     }
 

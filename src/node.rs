@@ -73,12 +73,12 @@ pub struct Node<Addr> {
 
 impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32) -> Self {
         Self {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(discovery_interval),
-            heartbeat: HeartbeatManager::new(heartbeat_interval),
+            heartbeat: HeartbeatManager::new(0),
         }
     }
 
@@ -128,8 +128,13 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
                 data: &raw[4..end as usize],
             }))
         } else {
-            DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            let Some(DiscoveryMessage::Welcome(interval)) = DiscoveryMessage::from_bytes(raw)
+            else {
+                return Err(NodeError::InvalidMessage);
+            };
+
             self.controller = Some(addr);
+            self.heartbeat.set_interval(interval);
             self.heartbeat.reset(now);
 
             Ok(Some(NodeEvent::ControllerConnected))

@@ -92,12 +92,25 @@ impl<Addr> Controller<Addr> {
     }
 
     /// Authorize a pending node.
+    ///
+    /// The array returned is a welcome message that notifies the node it is now connected to the
+    /// network. Once it is sent, the node will understand that it can start sending valid data
+    /// messages to the controller.
     #[inline]
-    pub fn authorize(&mut self, id: DeviceId) -> Result<(), ControllerError> {
+    pub fn authorize(
+        &mut self,
+        id: DeviceId,
+        heartbeat_interval: u32,
+    ) -> Result<[u8; 5], ControllerError> {
         self.registry
             .add_node(id)
             .map_err(ControllerError::Registry)?;
-        Ok(())
+
+        let msg = DiscoveryMessage::new_welcome(heartbeat_interval);
+        let mut raw = [0u8; 5];
+        msg.to_bytes(&mut raw[..]);
+
+        Ok(raw)
     }
 
     fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> ControllerResult {
@@ -120,9 +133,10 @@ impl<Addr> Controller<Addr> {
             .update_node(from)
             .map_err(ControllerError::Registry)?;
 
+        let end = len + 4;
         Ok(Some(ControllerEvent::DataReceived {
             from,
-            range: 3..len as usize,
+            range: 4..end as usize,
         }))
     }
 

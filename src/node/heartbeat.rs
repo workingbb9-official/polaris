@@ -41,6 +41,11 @@ impl HeartbeatManager {
     }
 
     #[inline]
+    pub(crate) fn set_interval(&mut self, interval: u32) {
+        self.send_interval = interval;
+    }
+
+    #[inline]
     pub(crate) fn reset(&mut self, now: u32) {
         self.last_sent = now;
     }

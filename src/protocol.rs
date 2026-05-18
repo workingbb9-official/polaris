@@ -107,7 +107,8 @@ impl DataMessage {
 #[derive(Debug, Clone)]
 pub(crate) enum DiscoveryMessage {
     Hello(DeviceId),
-    Welcome,
+    // Heartbeat interval
+    Welcome(u32),
 }
 
 impl DiscoveryMessage {
@@ -115,22 +116,22 @@ impl DiscoveryMessage {
         DiscoveryMessage::Hello(node_id)
     }
 
-    pub(crate) fn new_welcome() -> Self {
-        DiscoveryMessage::Welcome
+    pub(crate) fn new_welcome(heartbeat_interval: u32) -> Self {
+        DiscoveryMessage::Welcome(heartbeat_interval)
     }
 
-    pub(crate) fn to_bytes(&self) -> [u8; 3] {
-        let mut buf = [0u8; 3];
-
+    pub(crate) fn to_bytes(&self, buf: &mut [u8]) -> usize {
         match self {
             DiscoveryMessage::Hello(node_id) => {
                 buf[0] = MSG_TYPE_HELLO;
                 buf[1..3].copy_from_slice(&node_id.value().to_be_bytes());
-                buf
+                3
             }
-            DiscoveryMessage::Welcome => {
+            DiscoveryMessage::Welcome(interval) => {
+                let mut buf = [0u8; 5];
                 buf[0] = MSG_TYPE_WELCOME;
-                buf
+                buf[1..5].copy_from_slice(&interval.to_be_bytes());
+                5
             }
         }
     }
@@ -141,7 +142,10 @@ impl DiscoveryMessage {
                 let node_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
                 Some(Self::Hello(node_id))
             }
-            MSG_TYPE_WELCOME => Some(Self::Welcome),
+            MSG_TYPE_WELCOME => {
+                let interval = u32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
+                Some(Self::Welcome(interval))
+            }
             _ => None,
         }
     }
@@ -236,8 +240,9 @@ mod tests {
         let node_id = DeviceId::new(10);
 
         let msg = DiscoveryMessage::new_hello(node_id);
-        let bytes = msg.to_bytes();
-        let parsed = DiscoveryMessage::from_bytes(&bytes);
+        let mut raw = [0u8; 3];
+        msg.to_bytes(&mut raw[..]);
+        let parsed = DiscoveryMessage::from_bytes(&raw);
 
         assert!(matches!(parsed, Some(DiscoveryMessage::Hello(id)) if id == node_id));
     }

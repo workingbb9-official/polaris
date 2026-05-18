@@ -73,12 +73,12 @@ pub struct Node<Addr> {
 
 impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32, heartbeat_interval: u32) -> Self {
+    pub fn new(dev: Device, discovery_interval: u32) -> Self {
         Self {
             dev,
             controller: None,
             discovery: DiscoveryManager::new(discovery_interval),
-            heartbeat: HeartbeatManager::new(heartbeat_interval),
+            heartbeat: HeartbeatManager::new(0),
         }
     }
 
@@ -100,7 +100,8 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
             }
         } else if self.discovery.action(now) == DiscoveryAction::Broadcast {
             let msg = DiscoveryMessage::new_hello(self.dev.id());
-            let raw = msg.to_bytes();
+            let mut raw = [0u8; 3];
+            msg.to_bytes(&mut raw[..]);
             Some(NodeAction::SendDiscovery { msg: raw })
         } else {
             None
@@ -121,12 +122,19 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
 
             DataMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
             let len = raw[3];
+            let end = len + 4;
+
             Ok(Some(NodeEvent::DataReceived {
-                data: &raw[3..len as usize],
+                data: &raw[4..end as usize],
             }))
         } else {
-            DiscoveryMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+            let Some(DiscoveryMessage::Welcome(interval)) = DiscoveryMessage::from_bytes(raw)
+            else {
+                return Err(NodeError::InvalidMessage);
+            };
+
             self.controller = Some(addr);
+            self.heartbeat.set_interval(interval);
             self.heartbeat.reset(now);
 
             Ok(Some(NodeEvent::ControllerConnected))

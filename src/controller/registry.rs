@@ -83,6 +83,21 @@ impl<Addr> NodeRegistry<Addr> {
         Ok(())
     }
 
+    pub(crate) fn prune_nodes(&mut self) -> Vec<DeviceId> {
+        let mut dead_nodes = Vec::new();
+
+        self.nodes.retain(|id, entry| {
+            if Instant::now() - entry.seen >= entry.timeout {
+                dead_nodes.push(*id);
+                false
+            } else {
+                true
+            }
+        });
+
+        dead_nodes
+    }
+
     pub(crate) fn addr(&self, id: DeviceId) -> Result<&Addr, RegistryError> {
         let entry = self
             .nodes

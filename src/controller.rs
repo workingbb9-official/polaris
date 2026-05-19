@@ -88,8 +88,17 @@ impl<Addr> Controller<Addr> {
         }
     }
 
-    #[inline]
+    /// Check node timeouts and remove if necessary.
+    pub fn prune(&mut self) -> Vec<ControllerEvent> {
+        let dead_nodes = self.registry.prune_nodes();
+        dead_nodes
+            .into_iter()
+            .map(ControllerEvent::NodeTimedOut)
+            .collect()
+    }
+
     /// Get the network address of a node.
+    #[inline]
     pub fn addr(&self, id: DeviceId) -> Result<&Addr, ControllerError> {
         self.registry.addr(id).map_err(ControllerError::Registry)
     }

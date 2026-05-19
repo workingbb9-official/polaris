@@ -14,7 +14,7 @@
 
 #![allow(dead_code)]
 
-use crate::device::DeviceId;
+use crate::device::{Device, DeviceId, DeviceType};
 
 pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
 pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
@@ -106,14 +106,14 @@ impl DataMessage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum DiscoveryMessage {
-    Hello(DeviceId),
+    Hello(Device),
     // Heartbeat interval
     Welcome(u32),
 }
 
 impl DiscoveryMessage {
-    pub(crate) fn new_hello(node_id: DeviceId) -> Self {
-        DiscoveryMessage::Hello(node_id)
+    pub(crate) fn new_hello(dev: Device) -> Self {
+        DiscoveryMessage::Hello(dev)
     }
 
     pub(crate) fn new_welcome(heartbeat_interval: u32) -> Self {
@@ -122,10 +122,11 @@ impl DiscoveryMessage {
 
     pub(crate) fn to_bytes(&self, buf: &mut [u8]) -> usize {
         match self {
-            DiscoveryMessage::Hello(node_id) => {
+            DiscoveryMessage::Hello(dev) => {
                 buf[0] = MSG_TYPE_HELLO;
-                buf[1..3].copy_from_slice(&node_id.value().to_be_bytes());
-                3
+                buf[1..3].copy_from_slice(&dev.id().value().to_be_bytes());
+                buf[3..5].copy_from_slice(&dev.dev_type().value().to_be_bytes());
+                5
             }
             DiscoveryMessage::Welcome(interval) => {
                 let mut buf = [0u8; 5];
@@ -139,8 +140,11 @@ impl DiscoveryMessage {
     pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
         match buf[0] {
             MSG_TYPE_HELLO => {
-                let node_id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
-                Some(Self::Hello(node_id))
+                let id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
+                let dev_type = DeviceType::new(u16::from_be_bytes([buf[3], buf[4]]));
+
+                let dev = Device::new(id, dev_type);
+                Some(Self::Hello(dev))
             }
             MSG_TYPE_WELCOME => {
                 let interval = u32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
@@ -237,14 +241,16 @@ mod tests {
 
     #[test]
     fn test_discovery_message_trip() {
-        let node_id = DeviceId::new(10);
+        let id = DeviceId::new(10);
+        let dev_type = DeviceType::new(20);
+        let dev = Device::new(id, dev_type);
 
-        let msg = DiscoveryMessage::new_hello(node_id);
-        let mut raw = [0u8; 3];
+        let msg = DiscoveryMessage::new_hello(dev);
+        let mut raw = [0u8; 5];
         msg.to_bytes(&mut raw[..]);
         let parsed = DiscoveryMessage::from_bytes(&raw);
 
-        assert!(matches!(parsed, Some(DiscoveryMessage::Hello(id)) if id == node_id));
+        assert!(matches!(parsed, Some(DiscoveryMessage::Hello(out_dev)) if out_dev == dev));
     }
 
     #[test]

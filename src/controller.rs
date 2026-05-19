@@ -132,11 +132,11 @@ impl<Addr> Controller<Addr> {
     }
 
     fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> ControllerResult {
-        if let Some(DiscoveryMessage::Hello(node_id)) = DiscoveryMessage::from_bytes(raw) {
+        if let Some(DiscoveryMessage::Hello(dev)) = DiscoveryMessage::from_bytes(raw) {
             self.registry
-                .add_pending(node_id, addr)
+                .add_pending(dev.id(), addr)
                 .map_err(ControllerError::Registry)?;
-            Ok(Some(ControllerEvent::NodeDiscovered(node_id)))
+            Ok(Some(ControllerEvent::NodeDiscovered(dev.id())))
         } else {
             Err(ControllerError::InvalidMessage)
         }

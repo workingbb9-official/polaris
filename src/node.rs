@@ -99,7 +99,7 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
                 None
             }
         } else if self.discovery.action(now) == DiscoveryAction::Broadcast {
-            let msg = DiscoveryMessage::new_hello(self.dev.id());
+            let msg = DiscoveryMessage::new_hello(self.dev);
             let mut raw = [0u8; 3];
             msg.to_bytes(&mut raw[..]);
             Some(NodeAction::SendDiscovery { msg: raw })

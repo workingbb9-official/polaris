@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::device::DeviceId;
+use crate::device::{Device, DeviceId};
 
 #[derive(Debug, PartialEq)]
 pub enum RegistryError {
@@ -30,6 +30,7 @@ pub enum RegistryError {
 
 #[derive(Debug, PartialEq)]
 struct NodeEntry<Addr> {
+    dev: Device,
     addr: Addr,
     seen: Instant,
     timeout: Duration,
@@ -106,8 +107,8 @@ impl<Addr> NodeRegistry<Addr> {
         Ok(&entry.addr)
     }
 
-    pub(crate) fn add_pending(&mut self, id: DeviceId, addr: Addr) -> Result<(), RegistryError> {
-        if self.nodes.contains_key(&id) || self.pending.contains_key(&id) {
+    pub(crate) fn add_pending(&mut self, dev: Device, addr: Addr) -> Result<(), RegistryError> {
+        if self.nodes.contains_key(&dev.id()) || self.pending.contains_key(&dev.id()) {
             return Err(RegistryError::DeviceIdInUse);
         }
 
@@ -116,12 +117,13 @@ impl<Addr> NodeRegistry<Addr> {
         }
 
         let node = NodeEntry {
+            dev,
             addr,
             seen: Instant::now(),
             timeout: Duration::from_secs(0),
         };
 
-        self.pending.insert(id, node);
+        self.pending.insert(dev.id(), node);
         Ok(())
     }
 }

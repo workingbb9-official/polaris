@@ -31,9 +31,10 @@ pub enum ControllerEvent {
         from: DeviceId,
         range: core::ops::Range<usize>,
     },
-    /// A node has been discovered and added to the registry. Store this [DeviceId], because the
-    /// controller will return this for context on which device has sent data.
-    NodeDiscovered(DeviceId),
+    /// A node has been discovered and added to the pending registry. Store this [Device] and use
+    /// its [DeviceId] to authorize the node so that it can begin sending data.  The DeviceId will
+    /// also be returned by the library to identify where the data is coming from.
+    NodeDiscovered(Device),
     /// A node has not sent a heartbeat message within the pre-determined time. It will be removed
     /// from the internal registry.
     NodeTimedOut(DeviceId),
@@ -134,9 +135,9 @@ impl<Addr> Controller<Addr> {
     fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> ControllerResult {
         if let Some(DiscoveryMessage::Hello(dev)) = DiscoveryMessage::from_bytes(raw) {
             self.registry
-                .add_pending(dev.id(), addr)
+                .add_pending(dev, addr)
                 .map_err(ControllerError::Registry)?;
-            Ok(Some(ControllerEvent::NodeDiscovered(dev.id())))
+            Ok(Some(ControllerEvent::NodeDiscovered(dev)))
         } else {
             Err(ControllerError::InvalidMessage)
         }

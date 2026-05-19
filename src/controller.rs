@@ -34,6 +34,9 @@ pub enum ControllerEvent {
     /// A node has been discovered and added to the registry. Store this [DeviceId], because the
     /// controller will return this for context on which device has sent data.
     NodeDiscovered(DeviceId),
+    /// A node has not sent a heartbeat message within the pre-determined time. It will be removed
+    /// from the internal registry.
+    NodeTimedOut(DeviceId),
 }
 
 /// The errors that can occur within a [Controller].
@@ -100,13 +103,19 @@ impl<Addr> Controller<Addr> {
     pub fn authorize(
         &mut self,
         id: DeviceId,
-        heartbeat_interval: u32,
+        heartbeat_interval: std::time::Duration,
     ) -> Result<[u8; 5], ControllerError> {
         self.registry
-            .add_node(id)
+            .add_node(id, heartbeat_interval)
             .map_err(ControllerError::Registry)?;
 
-        let msg = DiscoveryMessage::new_welcome(heartbeat_interval);
+        let msg = DiscoveryMessage::new_welcome(
+            heartbeat_interval
+                .as_millis()
+                .try_into()
+                .unwrap_or(u32::MAX),
+        );
+
         let mut raw = [0u8; 5];
         msg.to_bytes(&mut raw[..]);
 

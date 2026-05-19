@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::device::DeviceId;
 
@@ -32,6 +32,7 @@ pub enum RegistryError {
 struct NodeEntry<Addr> {
     addr: Addr,
     seen: Instant,
+    timeout: Duration,
 }
 
 #[derive(Debug)]
@@ -50,7 +51,11 @@ impl<Addr> NodeRegistry<Addr> {
         }
     }
 
-    pub(crate) fn add_node(&mut self, id: DeviceId) -> Result<(), RegistryError> {
+    pub(crate) fn add_node(
+        &mut self,
+        id: DeviceId,
+        timeout: Duration,
+    ) -> Result<(), RegistryError> {
         if self.nodes.contains_key(&id) {
             return Err(RegistryError::DeviceIdInUse);
         }
@@ -59,7 +64,8 @@ impl<Addr> NodeRegistry<Addr> {
             return Err(RegistryError::MaxNodesReached);
         }
 
-        if let Some(pending) = self.pending.remove(&id) {
+        if let Some(mut pending) = self.pending.remove(&id) {
+            pending.timeout = timeout;
             self.nodes.insert(id, pending);
         } else {
             return Err(RegistryError::NodeNotRegistered);
@@ -75,6 +81,21 @@ impl<Addr> NodeRegistry<Addr> {
             .ok_or(RegistryError::NodeNotRegistered)?;
         entry.seen = Instant::now();
         Ok(())
+    }
+
+    pub(crate) fn prune_nodes(&mut self) -> Vec<DeviceId> {
+        let mut dead_nodes = Vec::new();
+
+        self.nodes.retain(|id, entry| {
+            if Instant::now() - entry.seen >= entry.timeout {
+                dead_nodes.push(*id);
+                false
+            } else {
+                true
+            }
+        });
+
+        dead_nodes
     }
 
     pub(crate) fn addr(&self, id: DeviceId) -> Result<&Addr, RegistryError> {
@@ -97,6 +118,7 @@ impl<Addr> NodeRegistry<Addr> {
         let node = NodeEntry {
             addr,
             seen: Instant::now(),
+            timeout: Duration::from_secs(0),
         };
 
         self.pending.insert(id, node);

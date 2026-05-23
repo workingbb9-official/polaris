@@ -12,71 +12,68 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod discovery;
-mod heartbeat;
+use crate::registry::{PeerRegistry, RegistryError};
+use crate::heartbeat::{HeartbeatManager, HeartbeatAction};
+use crate::discovery::{DiscoveryManager, DiscoveryAction};
 
-use discovery::DiscoveryAction;
-use discovery::DiscoveryManager;
+use crate::device::{Device, DeviceId};
+use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
 
-use heartbeat::HeartbeatAction;
-use heartbeat::HeartbeatManager;
-
-use crate::device::Device;
-use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage};
+type NodeResult = Result<Option<NodeEvent>, NodeError>;
 
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
-pub enum NodeEvent<'a> {
-    /// The node has connected to a controller. This enables the sending and receiving of data from
-    /// the controller.
-    ControllerConnected,
-    /// The node has received data from a controller. The buffer returned is a slice of the raw
-    /// packet, removing the headers and extracting the data up to the length specified by the
-    /// packet header.
-    DataReceived { data: &'a [u8] },
+pub enum NodeEvent {
+    /// The node has received data from a peer. 'from' is used to identify the [Device] that
+    /// sent the message. 'range' contains the starting and ending index of the raw data, without
+    /// the headers and up to the length specified by the packet.
+    DataReceived {
+        from: DeviceId,
+        range: core::ops::Range<usize>,
+    },
+    /// A peer has been discovered and added to the pending registry. Store this [Device] and use
+    /// its [DeviceId] to authorize the peer so that it can begin sending data.  The DeviceId will
+    /// also be returned by the library to identify where the data is coming from.
+    PeerDiscovered(Device),
+    /// A peer has not sent a heartbeat message within the pre-determined time. It will be removed
+    /// from the internal registry.
+    PeerTimedOut(DeviceId),
 }
 
 #[derive(Debug)]
 pub enum NodeAction<Addr> {
-    /// Send out a [HeartbeatMessage] to the controller. This ensures that the controller remains
-    /// connected to the node.
+    /// Send out a [HeartbeatMessage] to a peer. This ensures that the peer does not disconnect
+    /// from the node.
     SendHeartbeat { addr: Addr, msg: [u8; 3] },
     /// Send out a [DiscoveryMessage]. This should be sent over a broadcast address, so that any
-    /// potential controllers can see it.
+    /// potential peers can see it.
     SendDiscovery { msg: [u8; 3] },
 }
 
 /// The errors that can occur within a [Node].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum NodeError {
-    /// The node is not connected to a controller, which is necessary for the operation.
-    NotConnected,
-    /// The message sent was invalid. This could be due to an incorrect packet format that could
-    /// not be parsed, or the message type was invalid for the current state of the node.
+    /// The message received was invalid. This could be returned if the bytes could not be parsed
+    /// into a 'Message' object, or the message type was invalid for a node to receive.
     InvalidMessage,
-    /// The message received was sent from somebody that was not the connected controller. The
-    /// message is dropped for security.
-    WrongController,
+    /// There was an error within the registry. Error is held and propagated.
+    Registry(RegistryError),
 }
 
-/// A device which reports to a controller.
-///
-/// Nodes will remain simple and able to represent any type of device. They can be anything that
-/// operates independently and sends information to a controller.
 #[derive(Debug)]
 pub struct Node<Addr> {
     dev: Device,
-    controller: Option<Addr>,
+    registry: PeerRegistry<Addr>,
     discovery: DiscoveryManager,
     heartbeat: HeartbeatManager,
 }
 
-impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
+impl<Addr> Node<Addr> {
     /// Create a new node.
-    pub fn new(dev: Device, discovery_interval: u32) -> Self {
+    pub fn new(dev: Device, max_peers: usize, discovery_interval: u32) -> Self {
         Self {
             dev,
-            controller: None,
+            registry: PeerRegistry::new(max_peers),
             discovery: DiscoveryManager::new(discovery_interval),
             heartbeat: HeartbeatManager::new(0),
         }
@@ -108,52 +105,96 @@ impl<Addr: Copy + std::cmp::PartialEq> Node<Addr> {
         }
     }
 
-    /// Process a packet and return event.
-    pub fn process_msg<'a>(
+    pub fn process_msg(
         &mut self,
-        raw: &'a [u8],
+        raw: &mut [u8],
         addr: Addr,
-        now: u32,
-    ) -> Result<Option<NodeEvent<'a>>, NodeError> {
-        if let Some(con_addr) = self.controller.as_ref() {
-            if addr != *con_addr {
-                return Err(NodeError::WrongController);
-            }
-
-            DataMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
-            let len = raw[3];
-            let end = len + 4;
-
-            Ok(Some(NodeEvent::DataReceived {
-                data: &raw[4..end as usize],
-            }))
-        } else {
-            let Some(DiscoveryMessage::Welcome(interval)) = DiscoveryMessage::from_bytes(raw)
-            else {
-                return Err(NodeError::InvalidMessage);
-            };
-
-            self.controller = Some(addr);
-            self.heartbeat.set_interval(interval);
-            self.heartbeat.reset(now);
-
-            Ok(Some(NodeEvent::ControllerConnected))
+    ) -> Result<Option<NodeEvent>, NodeError> {
+        match MessageType::from_buf(raw) {
+            Some(MessageType::Hello) => self.process_hello(raw, addr),
+            Some(MessageType::Data) => self.process_data(raw),
+            Some(MessageType::Heartbeat) => self.process_heartbeat(raw),
+            Some(MessageType::Welcome) | None => Err(NodeError::InvalidMessage),
         }
     }
 
-    /// Reset the heartbeat timer.
-    ///
-    /// Call this when either a heartbeat message or a [DataMessage] is sent.
-    #[inline]
-    pub fn reset_heartbeat(&mut self, now: u32) {
-        self.heartbeat.reset(now);
+    /// Check peer timeouts and remove if necessary.
+    pub fn prune(&mut self) -> Vec<NodeEvent> {
+        let dead_peers = self.registry.prune_peers();
+        dead_peers
+            .into_iter()
+            .map(NodeEvent::PeerTimedOut)
+            .collect()
     }
 
-    /// Reset the discovery timer.
-    ///
-    /// Call this when a discovery message is sent.
+    /// Get the network address of a peer.
     #[inline]
-    pub fn reset_discovery(&mut self, now: u32) {
-        self.discovery.reset(now);
+    pub fn addr(&self, id: DeviceId) -> Result<&Addr, NodeError> {
+        self.registry.addr(id).map_err(NodeError::Registry)
+    }
+
+    /// Authorize a pending peer.
+    ///
+    /// The array returned is a welcome message that notifies the peer it is now connected to the
+    /// network. Once it is sent, the peer will understand that it can start sending valid data
+    /// messages to this node.
+    #[inline]
+    pub fn authorize(
+        &mut self,
+        id: DeviceId,
+        heartbeat_interval: std::time::Duration,
+    ) -> Result<[u8; 5], NodeError> {
+        self.registry
+            .add_peer(id, heartbeat_interval)
+            .map_err(NodeError::Registry)?;
+
+        let msg = DiscoveryMessage::new_welcome(
+            heartbeat_interval
+                .as_millis()
+                .try_into()
+                .unwrap_or(u32::MAX),
+        );
+
+        let mut raw = [0u8; 5];
+        msg.to_bytes(&mut raw[..]);
+
+        Ok(raw)
+    }
+
+    fn process_hello(&mut self, raw: &mut [u8], addr: Addr) -> NodeResult {
+        if let Some(DiscoveryMessage::Hello(dev)) = DiscoveryMessage::from_bytes(raw) {
+            self.registry
+                .add_pending(dev, addr)
+                .map_err(NodeError::Registry)?;
+            Ok(Some(NodeEvent::PeerDiscovered(dev)))
+        } else {
+            Err(NodeError::InvalidMessage)
+        }
+    }
+
+    fn process_data(&mut self, raw: &mut [u8]) -> NodeResult {
+        DataMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+        let len = raw[3];
+        let from = DeviceId::new(u16::from_be_bytes([raw[1], raw[2]]));
+
+        self.registry
+            .update_peer(from)
+            .map_err(NodeError::Registry)?;
+
+        let end = len + 4;
+        Ok(Some(NodeEvent::DataReceived {
+            from,
+            range: 4..end as usize,
+        }))
+    }
+
+    fn process_heartbeat(&mut self, raw: &mut [u8]) -> NodeResult {
+        let msg = HeartbeatMessage::from_bytes(raw).ok_or(NodeError::InvalidMessage)?;
+
+        let peer_id = msg.from();
+        self.registry
+            .update_peer(peer_id)
+            .map_err(NodeError::Registry)?;
+        Ok(None)
     }
 }

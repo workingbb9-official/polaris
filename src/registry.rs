@@ -12,11 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod device;
-mod node;
-mod protocol;
-mod peer;
+use crate::peer::Peer;
 
-pub use node::{Node, NodeError, NodeEvent};
-pub use device::{Device, DeviceId, DeviceType};
-pub use protocol::DataMessage;
+pub struct Registry<Addr, const MAX_PEERS: usize> {
+    peers: heapless::Vec<PeerSession<Addr>, MAX_PEERS>,
+}
+
+impl<Addr, const MAX_PEERS: usize> Registry<Addr, MAX_PEERS> {
+    pub(crate) fn new() -> Self {
+        Self { peers: heapless::Vec::new() }
+    }
+
+    pub(crate) fn add_peer(&mut self, peer: Peer) Result<(), ()> {
+        let id = peer.dev.id();
+        let addr = peer.addr;
+
+        if list.iter().any(|peer| peer.dev.id() == id) {
+            return Err(())
+        }
+
+        self.peers.push().map_err()
+    }
+}

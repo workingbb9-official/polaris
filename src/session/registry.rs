@@ -19,111 +19,120 @@ use crate::device::{Device, DeviceId};
 
 #[derive(Debug, PartialEq)]
 pub enum RegistryError {
-    /// Used on discovery to represent that the [DeviceId] of the node being connected to is
-    /// already in use by a stored node.
+    /// Used on discovery to represent that the [DeviceId] of the peer being connected to is
+    /// already in use by a stored peer.
     DeviceIdInUse,
-    /// The number of nodes in the registry has reached 'max_nodes', no more can be added.
-    MaxNodesReached,
-    /// The DeviceId of a node was not found within the registry.
-    NodeNotRegistered,
+    /// The number of peers in the registry has reached 'max_peers', no more can be added.
+    MaxPeersReached,
+    /// The DeviceId of a peer was not found within the registry.
+    PeerNotRegistered,
 }
 
 #[derive(Debug, PartialEq)]
-struct NodeEntry<Addr> {
+struct Peer<Addr> {
     dev: Device,
     addr: Addr,
-    seen: Instant,
+    last_seen: Instant,
     timeout: Duration,
+    last_sent: Instant,
+    send_interval: Duration,
 }
 
 #[derive(Debug)]
-pub(crate) struct NodeRegistry<Addr> {
-    nodes: HashMap<DeviceId, NodeEntry<Addr>>,
-    pending: HashMap<DeviceId, NodeEntry<Addr>>,
-    max_nodes: usize,
+pub(crate) struct PeerRegistry<Addr> {
+    peers: HashMap<DeviceId, Peer<Addr>>,
+    pending: HashMap<DeviceId, Peer<Addr>>,
+    max_peers: usize,
 }
 
-impl<Addr> NodeRegistry<Addr> {
-    pub(crate) fn new(max_nodes: usize) -> Self {
+impl<Addr> PeerRegistry<Addr> {
+    pub(crate) fn new(max_peers: usize) -> Self {
         Self {
-            nodes: HashMap::new(),
+            peers: HashMap::new(),
             pending: HashMap::new(),
-            max_nodes,
+            max_peers,
         }
     }
 
-    pub(crate) fn add_node(
+    pub(crate) fn add_peer(
         &mut self,
         id: DeviceId,
         timeout: Duration,
+        send_interval: Duration,
     ) -> Result<(), RegistryError> {
-        if self.nodes.contains_key(&id) {
+        if self.peers.contains_key(&id) {
             return Err(RegistryError::DeviceIdInUse);
         }
 
-        if self.nodes.len() >= self.max_nodes {
-            return Err(RegistryError::MaxNodesReached);
+        if self.peers.len() >= self.max_peers {
+            return Err(RegistryError::MaxPeersReached);
         }
 
         if let Some(mut pending) = self.pending.remove(&id) {
             pending.timeout = timeout;
-            self.nodes.insert(id, pending);
+            self.peers.insert(id, pending);
         } else {
-            return Err(RegistryError::NodeNotRegistered);
+            return Err(RegistryError::PeerNotRegistered);
         }
 
         Ok(())
     }
 
-    pub(crate) fn update_node(&mut self, id: DeviceId) -> Result<(), RegistryError> {
+    pub(crate) fn update_peer(&mut self, id: DeviceId) -> Result<(), RegistryError> {
         let entry = self
-            .nodes
+            .peers
             .get_mut(&id)
-            .ok_or(RegistryError::NodeNotRegistered)?;
+            .ok_or(RegistryError::PeerNotRegistered)?;
         entry.seen = Instant::now();
         Ok(())
     }
 
-    pub(crate) fn prune_nodes(&mut self) -> Vec<DeviceId> {
-        let mut dead_nodes = Vec::new();
+    pub(crate) fn prune_peers(&mut self) -> Vec<DeviceId> {
+        let mut dead_peers = Vec::new();
 
-        self.nodes.retain(|id, entry| {
+        self.peers.retain(|id, entry| {
             if Instant::now() - entry.seen >= entry.timeout {
-                dead_nodes.push(*id);
+                dead_peers.push(*id);
                 false
             } else {
                 true
             }
         });
 
-        dead_nodes
+        dead_peers
     }
 
     pub(crate) fn addr(&self, id: DeviceId) -> Result<&Addr, RegistryError> {
         let entry = self
-            .nodes
+            .peers
             .get(&id)
-            .ok_or(RegistryError::NodeNotRegistered)?;
+            .ok_or(RegistryError::PeerNotRegistered)?;
         Ok(&entry.addr)
     }
 
     pub(crate) fn add_pending(&mut self, dev: Device, addr: Addr) -> Result<(), RegistryError> {
-        if self.nodes.contains_key(&dev.id()) || self.pending.contains_key(&dev.id()) {
+        if self.peers.contains_key(&dev.id()) || self.pending.contains_key(&dev.id()) {
             return Err(RegistryError::DeviceIdInUse);
         }
 
-        if self.nodes.len() + self.pending.len() >= self.max_nodes {
-            return Err(RegistryError::MaxNodesReached);
+        if self.peers.len() + self.pending.len() >= self.max_peers {
+            return Err(RegistryError::MaxPeersReached);
         }
 
-        let node = NodeEntry {
+        let peer = Peer {
             dev,
             addr,
-            seen: Instant::now(),
+            last_seen: Instant::now(),
             timeout: Duration::from_secs(0),
+            last_sent: Instant::now(),
+            send_interval: Duration::from_secs(0),
         };
 
-        self.pending.insert(dev.id(), node);
+        self.pending.insert(dev.id(), peer);
         Ok(())
+    }
+
+    pub(crate) fn peers(&self) -> &HashMap<DeviceId, Peer<Addr>> {
+        &self.peers
     }
 }

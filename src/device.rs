@@ -14,8 +14,10 @@
 
 #![allow(dead_code)]
 
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
 /// Metadata for all devices.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Device {
     id: DeviceId,
     dev_type: DeviceType,
@@ -26,23 +28,27 @@ impl Device {
         Self { id, dev_type }
     }
 
-    pub(crate) fn id(&self) -> DeviceId {
+    /// Access the [DeviceId].
+    #[inline]
+    pub fn id(&self) -> DeviceId {
         self.id
     }
 
-    pub(crate) fn dev_type(&self) -> DeviceType {
+    /// Access the [DeviceType].
+    #[inline]
+    pub fn dev_type(&self) -> DeviceType {
         self.dev_type
     }
 }
 
 /// A unique identifier for every [Device].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(transparent)]
 pub struct DeviceId(u16);
 
 impl DeviceId {
-    /// Creates a new DeviceId.
     #[inline]
-    pub fn new(val: u16) -> Self {
+    pub(crate) fn new(val: u16) -> Self {
         Self(val)
     }
 
@@ -54,19 +60,19 @@ impl DeviceId {
 }
 
 /// Describes what a [Device] is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(transparent)]
 pub struct DeviceType(u16);
 
 impl DeviceType {
-    /// Creates a new DeviceType.
     #[inline]
     pub(crate) fn new(val: u16) -> Self {
         Self(val)
     }
 
-    /// Accesses the numeric value of the Type.
+    /// Accesses the numeric value of the type.
     #[inline]
-    pub(crate) fn value(&self) -> u16 {
+    pub fn value(&self) -> u16 {
         self.0
     }
 }

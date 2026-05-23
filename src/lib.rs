@@ -14,9 +14,9 @@
 
 mod device;
 mod node;
-mod protocol;
 mod peer;
+mod protocol;
+mod registry;
 
-pub use node::{Node, NodeError, NodeEvent};
 pub use device::{Device, DeviceId, DeviceType};
-pub use protocol::DataMessage;
+pub use node::{Node, NodeError, NodeEvent};

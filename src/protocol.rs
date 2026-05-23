@@ -14,253 +14,72 @@
 
 #![allow(dead_code)]
 
-use crate::device::{Device, DeviceId, DeviceType};
-
-pub(crate) const MSG_TYPE_HELLO: u8 = 0x01;
-pub(crate) const MSG_TYPE_WELCOME: u8 = 0x02;
-pub(crate) const MSG_TYPE_DATA: u8 = 0x03;
-pub(crate) const MSG_TYPE_HEARTBEAT: u8 = 0x04;
+use crate::device::{Device, DeviceId};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub(crate) enum MessageType {
-    Hello,
-    Welcome,
-    Data,
-    Heartbeat,
+    Unknown = 0x00,
+    Hello = 0x01,
+    Welcome = 0x02,
+    Data = 0x03,
+    Heartbeat = 0x04,
 }
 
-impl MessageType {
-    pub(crate) fn from_buf(buf: &[u8]) -> Option<Self> {
-        match buf[0] {
-            MSG_TYPE_HELLO => Some(MessageType::Hello),
-            MSG_TYPE_WELCOME => Some(MessageType::Welcome),
-            MSG_TYPE_DATA => Some(MessageType::Data),
-            MSG_TYPE_HEARTBEAT => Some(MessageType::Heartbeat),
-            _ => None,
+impl TryFrom<u8> for MessageType {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x01 => Ok(MessageType::Hello),
+            0x02 => Ok(MessageType::Welcome),
+            0x03 => Ok(MessageType::Data),
+            0x04 => Ok(MessageType::Heartbeat),
+            _ => Err(()),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataMessage {
-    from: DeviceId,
-    payload: [u8; 255],
-    len: usize,
+#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
+pub(crate) struct Packet<T> {
+    pub msg_type: u8,
+    pub payload: T,
 }
 
-impl DataMessage {
-    pub fn new(from: DeviceId, payload: &[u8]) -> Self {
-        let mut buf = [0u8; 255];
-        let len = payload.len().min(255);
-        buf[..len].copy_from_slice(&payload[..len]);
-
+impl<P> Packet<P> {
+    pub fn new(msg_type: MessageType, payload: P) -> Self {
         Self {
-            from,
-            payload: buf,
-            len,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn from(&self) -> DeviceId {
-        self.from
-    }
-
-    #[inline]
-    pub(crate) fn payload(&self) -> &[u8] {
-        &self.payload[..self.len]
-    }
-
-    pub(crate) fn to_bytes(&self) -> [u8; 259] {
-        let mut buf = [0u8; 259];
-        buf[0] = MSG_TYPE_DATA;
-        buf[1..3].copy_from_slice(&self.from.value().to_be_bytes());
-        buf[3] = self.len as u8;
-        buf[4..self.len + 4].copy_from_slice(self.payload());
-
-        buf
-    }
-
-    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf[0] != MSG_TYPE_DATA {
-            return None;
-        }
-
-        if buf.len() < 4 {
-            return None;
-        }
-
-        let from = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
-        let len = buf[3] as usize;
-
-        if buf.len() < len + 4 {
-            return None;
-        }
-
-        let mut payload = [0u8; 255];
-        payload[..len].copy_from_slice(&buf[4..len + 4]);
-
-        Some(Self { from, payload, len })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum DiscoveryMessage {
-    Hello(Device),
-    // Heartbeat interval
-    Welcome(u32),
-}
-
-impl DiscoveryMessage {
-    pub(crate) fn new_hello(dev: Device) -> Self {
-        DiscoveryMessage::Hello(dev)
-    }
-
-    pub(crate) fn new_welcome(heartbeat_interval: u32) -> Self {
-        DiscoveryMessage::Welcome(heartbeat_interval)
-    }
-
-    pub(crate) fn to_bytes(&self, buf: &mut [u8]) -> usize {
-        match self {
-            DiscoveryMessage::Hello(dev) => {
-                buf[0] = MSG_TYPE_HELLO;
-                buf[1..3].copy_from_slice(&dev.id().value().to_be_bytes());
-                buf[3..5].copy_from_slice(&dev.dev_type().value().to_be_bytes());
-                5
-            }
-            DiscoveryMessage::Welcome(interval) => {
-                let mut buf = [0u8; 5];
-                buf[0] = MSG_TYPE_WELCOME;
-                buf[1..5].copy_from_slice(&interval.to_be_bytes());
-                5
-            }
-        }
-    }
-
-    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
-        match buf[0] {
-            MSG_TYPE_HELLO => {
-                let id = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
-                let dev_type = DeviceType::new(u16::from_be_bytes([buf[3], buf[4]]));
-
-                let dev = Device::new(id, dev_type);
-                Some(Self::Hello(dev))
-            }
-            MSG_TYPE_WELCOME => {
-                let interval = u32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
-                Some(Self::Welcome(interval))
-            }
-            _ => None,
+            msg_type: msg_type as u8,
+            payload,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
+pub(crate) struct HelloMessage {
+    pub dev: Device,
+    pub heartbeat_interval: u32,
+}
+
+#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
+pub(crate) struct WelcomeMessage {
+    pub dev: Device,
+    pub heartbeat_interval: u32,
+}
+
+#[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
+pub(crate) struct DataMessage {
+    pub from: DeviceId,
+    pub len: u8,
+    pub payload: [u8; 255],
+}
+
+#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[repr(C, packed)]
 pub(crate) struct HeartbeatMessage {
-    from: DeviceId,
-}
-
-impl HeartbeatMessage {
-    pub(crate) fn new(from: DeviceId) -> Self {
-        Self { from }
-    }
-
-    pub(crate) fn to_bytes(&self) -> [u8; 3] {
-        let mut buf = [0u8; 3];
-
-        buf[0] = MSG_TYPE_HEARTBEAT;
-        buf[1..3].copy_from_slice(&self.from.value().to_be_bytes());
-        buf
-    }
-
-    pub(crate) fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf[0] != MSG_TYPE_HEARTBEAT {
-            return None;
-        }
-
-        if buf.len() < 3 {
-            return None;
-        }
-
-        let from = DeviceId::new(u16::from_be_bytes([buf[1], buf[2]]));
-        Some(Self { from })
-    }
-
-    pub(crate) fn from(&self) -> DeviceId {
-        self.from
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new_message_oversized_payload() {
-        let buf = [0xFFu8; 300];
-        let msg = DataMessage::new(DeviceId::new(7), &buf);
-
-        assert_eq!(msg.len, 255);
-        assert_eq!(msg.payload().len(), 255);
-    }
-
-    #[test]
-    fn test_new_message_undersized_payload() {
-        let buf = [0xFFu8; 128];
-        let msg = DataMessage::new(DeviceId::new(7), &buf);
-
-        assert_eq!(msg.len, 128);
-        assert_eq!(msg.payload().len(), 128);
-    }
-
-    #[test]
-    fn test_data_message_trip() {
-        let from = DeviceId::new(10);
-        let payload = [0xABu8; 128];
-
-        let msg = DataMessage::new(from, &payload);
-        let bytes = msg.to_bytes();
-        let parsed = DataMessage::from_bytes(&bytes).unwrap();
-
-        assert_eq!(parsed.from(), from);
-        assert_eq!(parsed.payload(), msg.payload());
-    }
-
-    #[test]
-    fn test_data_message_long_len() {
-        let mut buf = [0u8; 128];
-        let payload = [0xABu8; 64];
-
-        buf[0] = MSG_TYPE_DATA;
-        buf[1..3].copy_from_slice(&10_u16.to_be_bytes());
-        buf[3] = 255;
-        buf[4..68].copy_from_slice(&payload);
-
-        assert!(DataMessage::from_bytes(&buf).is_none());
-    }
-
-    #[test]
-    fn test_discovery_message_trip() {
-        let id = DeviceId::new(10);
-        let dev_type = DeviceType::new(20);
-        let dev = Device::new(id, dev_type);
-
-        let msg = DiscoveryMessage::new_hello(dev);
-        let mut raw = [0u8; 5];
-        msg.to_bytes(&mut raw[..]);
-        let parsed = DiscoveryMessage::from_bytes(&raw);
-
-        assert!(matches!(parsed, Some(DiscoveryMessage::Hello(out_dev)) if out_dev == dev));
-    }
-
-    #[test]
-    fn test_heartbeat_message_trip() {
-        let id = DeviceId::new(10);
-
-        let msg = HeartbeatMessage::new(id);
-        let bytes = msg.to_bytes();
-        let parsed = HeartbeatMessage::from_bytes(&bytes).unwrap();
-
-        assert_eq!(parsed.from(), id);
-    }
+    pub from: DeviceId,
 }

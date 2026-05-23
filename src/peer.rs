@@ -14,14 +14,10 @@
 
 use crate::device::Device;
 
-pub(crate) enum PeerState {
-    Authorized,
-    Unauthorized,
-}
-
+#[derive(Debug)]
 pub(crate) struct Peer<Addr> {
-    pub(crate) dev: Device,
-    pub(crate) addr: Addr,
+    pub dev: Device,
+    pub addr: Addr,
     last_seen_ms: u32,
     last_sent_ms: u32,
     timeout_ms: u32,
@@ -29,7 +25,7 @@ pub(crate) struct Peer<Addr> {
 }
 
 impl<Addr> Peer<Addr> {
-    pub(crate) fn new(dev: Device, addr: Addr, now: u32, timeout_ms: u32, send_interval_ms: u32) -> Self {
+    pub fn new(dev: Device, addr: Addr, now: u32, timeout_ms: u32, send_interval_ms: u32) -> Self {
         Self {
             dev,
             addr,
@@ -41,12 +37,22 @@ impl<Addr> Peer<Addr> {
     }
 
     #[inline]
-    pub(crate) fn is_timed_out(&self, now: u32) -> bool {
+    pub fn is_timed_out(&self, now: u32) -> bool {
         now.wrapping_sub(self.last_seen_ms) >= self.timeout_ms
     }
 
     #[inline]
-    pub(crate) fn needs_heartbeat(&self, now: u32) -> bool {
+    pub fn needs_heartbeat(&self, now: u32) -> bool {
         now.wrapping_sub(self.last_sent_ms) >= self.send_interval_ms
+    }
+
+    #[inline]
+    pub fn update_last_seen(&mut self, now: u32) {
+        self.last_seen_ms = now;
+    }
+
+    #[inline]
+    pub fn update_last_sent(&mut self, now: u32) {
+        self.last_sent_ms = now;
     }
 }

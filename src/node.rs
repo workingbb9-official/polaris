@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::registry::{PeerRegistry, RegistryError};
-use crate::heartbeat::{HeartbeatManager, HeartbeatAction};
-use crate::discovery::{DiscoveryManager, DiscoveryAction};
-
 use crate::device::{Device, DeviceId};
-use crate::protocol::{DataMessage, DiscoveryMessage, HeartbeatMessage, MessageType};
+use crate::protocol::{HeartbeatMessage, HelloMessage, MessageType, Packet};
+use crate::registry::{PeerRegistry, RegistryError};
 
-type NodeResult = Result<Option<NodeEvent>, NodeError>;
+use heapless::Vec;
+use zerocopy::{FromBytes, IntoBytes};
 
 /// The significant events that can occur within a [Node].
 #[derive(Debug, PartialEq, Eq)]
@@ -37,17 +35,17 @@ pub enum NodeEvent {
     PeerDiscovered(Device),
     /// A peer has not sent a heartbeat message within the pre-determined time. It will be removed
     /// from the internal registry.
-    PeerTimedOut(DeviceId),
+    PeerTimedOut(Device),
 }
 
 #[derive(Debug)]
-pub enum NodeAction<Addr> {
-    /// Send out a [HeartbeatMessage] to a peer. This ensures that the peer does not disconnect
+pub enum NodeAction {
+    /// Send out a heartbeat message to a peer. This ensures that the peer does not disconnect
     /// from the node.
-    SendHeartbeat { addr: Addr, msg: [u8; 3] },
-    /// Send out a [DiscoveryMessage]. This should be sent over a broadcast address, so that any
+    SendHeartbeat { dev: Device, msg: [u8; 3] },
+    /// Send out a discovery message. This should be sent over a broadcast address, so that any
     /// potential peers can see it.
-    SendDiscovery { msg: [u8; 3] },
+    SendHello { msg: [u8; 3] },
 }
 
 /// The errors that can occur within a [Node].
@@ -56,26 +54,22 @@ pub enum NodeError {
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' object, or the message type was invalid for a node to receive.
     InvalidMessage,
-    /// There was an error within the registry. Error is held and propagated.
+    /// Error propagated from the registry.
     Registry(RegistryError),
 }
 
 #[derive(Debug)]
-pub struct Node<Addr> {
+pub struct Node<Addr, const MAX_PEERS: usize> {
     dev: Device,
-    registry: PeerRegistry<Addr>,
-    discovery: DiscoveryManager,
-    heartbeat: HeartbeatManager,
+    registry: PeerRegistry<Addr, MAX_PEERS>,
 }
 
-impl<Addr> Node<Addr> {
+impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
     /// Create a new node.
-    pub fn new(dev: Device, max_peers: usize, discovery_interval: u32) -> Self {
+    pub fn new(dev: Device) -> Self {
         Self {
             dev,
-            registry: PeerRegistry::new(max_peers),
-            discovery: DiscoveryManager::new(discovery_interval),
-            heartbeat: HeartbeatManager::new(0),
+            registry: PeerRegistry::new(),
         }
     }
 
@@ -85,7 +79,102 @@ impl<Addr> Node<Addr> {
         self.dev
     }
 
-    /// Return an optional action to take based on current state.
+    /// Get the addr of a peer by its [DeviceId].
+    #[inline]
+    pub fn addr(&self, id: DeviceId) -> Option<&Addr> {
+        self.registry.addr(id)
+    }
+
+    /// Collect passive events and actions to take.
+    ///
+    /// This will push pending actions and events into provided buffers. The size of these buffers
+    /// should be determined based on system memory and level of importance.
+    pub fn tick<const E: usize, const A: usize>(
+        &mut self,
+        now: u32,
+        out_events: &mut Vec<NodeEvent, E>,
+        out_actions: &mut Vec<NodeAction, A>,
+    ) {
+        for dev in self.registry.dead_peers(now) {
+            if out_events.is_full() {
+                break;
+            } else {
+                out_events
+                    .push(NodeEvent::PeerTimedOut(dev))
+                    .expect("Already checked if vector was full");
+                self.registry.remove(dev.id());
+            }
+        }
+
+        for dev in self.registry.pending_heartbeats(now) {
+            if out_actions.is_full() {
+                break;
+            } else {
+                let msg = HeartbeatMessage {
+                    from: self.dev.id(),
+                };
+                let packet = Packet::new(MessageType::Heartbeat, msg);
+
+                out_actions
+                    .push(NodeAction::SendHeartbeat {
+                        dev,
+                        msg: packet
+                            .as_bytes()
+                            .try_into()
+                            .expect("Heartbeat message is 2 bytes (DeviceId) and start byte is 1"),
+                    })
+                    .expect("Already checked if vector was full");
+            }
+        }
+    }
+
+    pub fn process_msg(
+        &mut self,
+        raw: &[u8],
+        addr: Addr,
+        now: u32,
+    ) -> Result<Option<NodeEvent>, NodeError> {
+        if raw.is_empty() {
+            return Err(NodeError::InvalidMessage);
+        }
+
+        let msg_type = match MessageType::try_from(raw[0]) {
+            Ok(t) => t,
+            Err(_) => return Err(NodeError::InvalidMessage),
+        };
+
+        match msg_type {
+            MessageType::Hello => {
+                if let Ok(packet) = Packet::<HelloMessage>::ref_from_bytes(raw) {
+                    let hello = &packet.payload;
+                    self.process_hello(hello, addr, now).map(|_| None)
+                } else {
+                    return Err(NodeError::InvalidMessage);
+                }
+            }
+            MessageType::Heartbeat => {
+                if let Ok(packet) = Packet::<HeartbeatMessage>::ref_from_bytes(raw) {
+                    let heartbeat = &packet.payload;
+                    self.process_heartbeat(heartbeat, now).map(|_| None)
+                } else {
+                    return Err(NodeError::InvalidMessage);
+                }
+            }
+            _ => todo!(),
+        }
+    }
+
+    fn process_hello(&mut self, msg: &HelloMessage, addr: Addr, now: u32) -> Result<(), NodeError> {
+        todo!()
+    }
+
+    fn process_heartbeat(&mut self, msg: &HeartbeatMessage, now: u32) -> Result<(), NodeError> {
+        self.registry
+            .update_peer(msg.from, now)
+            .map_err(NodeError::Registry)
+    }
+
+    /*    /// Return an optional action to take based on current state.
     pub fn action(&mut self, now: u32) -> Option<NodeAction<Addr>> {
         if let Some(addr) = self.controller {
             if self.heartbeat.action(now) == HeartbeatAction::Send {
@@ -196,5 +285,5 @@ impl<Addr> Node<Addr> {
             .update_peer(peer_id)
             .map_err(NodeError::Registry)?;
         Ok(None)
-    }
+    } */
 }

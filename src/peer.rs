@@ -21,18 +21,16 @@ pub(crate) struct Peer<Addr> {
     last_seen_ms: u32,
     last_sent_ms: u32,
     timeout_ms: u32,
-    send_interval_ms: u32,
 }
 
 impl<Addr> Peer<Addr> {
-    pub fn new(dev: Device, addr: Addr, now: u32, timeout_ms: u32, send_interval_ms: u32) -> Self {
+    pub fn new(dev: Device, addr: Addr, now: u32, timeout_ms: u32) -> Self {
         Self {
             dev,
             addr,
             last_seen_ms: now,
             last_sent_ms: now,
             timeout_ms,
-            send_interval_ms,
         }
     }
 
@@ -42,8 +40,8 @@ impl<Addr> Peer<Addr> {
     }
 
     #[inline]
-    pub fn needs_heartbeat(&self, now: u32) -> bool {
-        now.wrapping_sub(self.last_sent_ms) >= self.send_interval_ms
+    pub fn needs_heartbeat(&self, now: u32, send_interval: u32) -> bool {
+        now.wrapping_sub(self.last_sent_ms) >= send_interval
     }
 
     #[inline]

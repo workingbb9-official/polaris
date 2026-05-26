@@ -48,12 +48,21 @@ impl<Addr, const MAX_PEERS: usize> PeerRegistry<Addr, MAX_PEERS> {
             .map_err(|_| RegistryError::MaxPeersReached)
     }
 
-    pub fn update_peer(&mut self, id: DeviceId, now: u32) -> Result<(), RegistryError> {
+    pub fn update_peer_seen(&mut self, id: DeviceId, now: u32) -> Result<(), RegistryError> {
         let Some(peer) = self.peers.iter_mut().find(|peer| peer.dev.id() == id) else {
             return Err(RegistryError::PeerNotRegistered);
         };
 
         peer.update_last_seen(now);
+        Ok(())
+    }
+
+    pub fn update_peer_sent(&mut self, id: DeviceId, now: u32) -> Result<(), RegistryError> {
+        let Some(peer) = self.peers.iter_mut().find(|peer| peer.dev.id() == id) else {
+            return Err(RegistryError::PeerNotRegistered);
+        };
+
+        peer.update_last_sent(now);
         Ok(())
     }
 
@@ -65,10 +74,10 @@ impl<Addr, const MAX_PEERS: usize> PeerRegistry<Addr, MAX_PEERS> {
             .collect()
     }
 
-    pub fn pending_heartbeats(&self, now: u32) -> Vec<Device, MAX_PEERS> {
+    pub fn pending_heartbeats(&self, now: u32, heartbeat_interval: u32) -> Vec<Device, MAX_PEERS> {
         self.peers
             .iter()
-            .filter(|peer: &&Peer<Addr>| peer.needs_heartbeat(now))
+            .filter(|peer: &&Peer<Addr>| peer.needs_heartbeat(now, heartbeat_interval))
             .map(|peer| peer.dev)
             .collect()
     }

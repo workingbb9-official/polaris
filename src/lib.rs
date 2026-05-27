@@ -8,4 +8,5 @@ mod protocol;
 mod registry;
 
 pub use device::{Device, DeviceId, DeviceType};
-pub use node::{Node, NodeError, NodeEvent};
+pub use node::{Node, NodeAction, NodeError, NodeEvent};
+pub use registry::RegistryError;

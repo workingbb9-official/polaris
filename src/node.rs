@@ -3,7 +3,9 @@
 
 use crate::device::{Device, DeviceId};
 use crate::peer::Peer;
-use crate::protocol::{HeartbeatMessage, HelloMessage, MessageType, Packet, WelcomeMessage};
+use crate::protocol::{
+    DataMessage, HeartbeatMessage, HelloMessage, MessageType, Packet, WelcomeMessage,
+};
 use crate::registry::{PeerRegistry, RegistryError};
 
 use heapless::Vec;
@@ -90,6 +92,38 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         self.registry.update_peer_sent(id, now)
     }
 
+    /// Construct a hello packet.
+    ///
+    /// This is used by a node during discovery to share its information with other nodes. It
+    /// should be sent over a broadcast address so that any peer within the network can receive.
+    pub fn create_hello(&self) -> [u8; 9] {
+        let msg = HelloMessage {
+            dev: self.dev,
+            heartbeat_interval: self.heartbeat_interval,
+        };
+
+        Packet::new(MessageType::Hello, msg)
+            .as_bytes()
+            .try_into()
+            .expect("HelloPacket should be 9 bytes")
+    }
+
+    pub fn create_data(&self, payload: &[u8]) -> [u8; 259] {
+        assert!(payload.len() <= 255);
+        let mut msg = DataMessage {
+            from: self.dev.id(),
+            len: payload.len() as u8,
+            payload: [0; 255],
+        };
+
+        msg.payload[..payload.len()].copy_from_slice(payload);
+
+        Packet::new(MessageType::Data, msg)
+            .as_bytes()
+            .try_into()
+            .expect("Data packet should be 259 bytes")
+    }
+
     /// Collect passive events and actions to take.
     ///
     /// This will push pending actions and events into provided buffers. The size of these buffers
@@ -106,7 +140,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             } else {
                 out_events
                     .push(NodeEvent::PeerTimedOut(dev))
-                    .expect("Already checked if vector was full");
+                    .expect("Should have checked if vector was full");
                 self.registry.remove(dev.id());
             }
         }
@@ -129,9 +163,9 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
                         msg: packet
                             .as_bytes()
                             .try_into()
-                            .expect("Heartbeat message is 2 bytes (DeviceId)"),
+                            .expect("Heartbeat packet should be 3 bytes"),
                     })
-                    .expect("Already checked if vector was full");
+                    .expect("Should have checked if vector was full");
             }
         }
     }
@@ -195,7 +229,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             msg: packet
                 .as_bytes()
                 .try_into()
-                .expect("Welcome message is 8 bytes (4 for the interval, 4 for Device"),
+                .expect("Welcome packet should be 9 bytes"),
         };
 
         Ok((event, action))

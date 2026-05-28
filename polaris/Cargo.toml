@@ -1,0 +1,9 @@
+[package]
+name = "polaris"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+heapless = { workspace = true }
+zerocopy = { workspace = true }

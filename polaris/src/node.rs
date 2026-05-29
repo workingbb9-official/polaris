@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 workingbb9-official
 
-use crate::device::{Device, DeviceId};
+use crate::device::{DEVICE_ID_LEN, Device, DeviceId};
 use crate::peer::Peer;
 use crate::protocol::{
     DataMessage, HeartbeatMessage, HelloMessage, MessageType, Packet, WelcomeMessage,
@@ -195,6 +195,15 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
                     Err(NodeError::InvalidMessage)
                 }
             }
+            MessageType::Welcome => {
+                if let Ok(packet) = Packet::<WelcomeMessage>::ref_from_bytes(raw) {
+                    let welcome = &packet.payload;
+                    self.process_welcome(welcome, addr, now)
+                        .map(|a| (Some(a), None))
+                } else {
+                    Err(NodeError::InvalidMessage)
+                }
+            }
             MessageType::Heartbeat => {
                 if let Ok(packet) = Packet::<HeartbeatMessage>::ref_from_bytes(raw) {
                     let heartbeat = &packet.payload;
@@ -204,11 +213,10 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
                     Err(NodeError::InvalidMessage)
                 }
             }
-            MessageType::Welcome => {
-                if let Ok(packet) = Packet::<WelcomeMessage>::ref_from_bytes(raw) {
-                    let welcome = &packet.payload;
-                    self.process_welcome(welcome, addr, now)
-                        .map(|a| (Some(a), None))
+            MessageType::Data => {
+                if let Ok(packet) = Packet::<DataMessage>::ref_from_bytes(raw) {
+                    let data = &packet.payload;
+                    self.process_data(data, addr, now).map(|a| (Some(a), None))
                 } else {
                     Err(NodeError::InvalidMessage)
                 }
@@ -273,5 +281,24 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             .map_err(NodeError::Registry)?;
 
         Ok(())
+    }
+
+    fn process_data(
+        &mut self,
+        msg: &DataMessage,
+        addr: Addr,
+        now: u32,
+    ) -> Result<NodeEvent, NodeError> {
+        // Data message doubles as heartbeat message
+        let heartbeat = HeartbeatMessage { from: msg.from };
+        self.process_heartbeat(&heartbeat, addr, now)?;
+
+        let start = DEVICE_ID_LEN + 1;
+        let end = start + msg.len as usize;
+
+        Ok(NodeEvent::DataReceived {
+            from: msg.from,
+            range: start..end,
+        })
     }
 }

@@ -78,6 +78,13 @@ impl<Addr, const MAX_PEERS: usize> PeerRegistry<Addr, MAX_PEERS> {
             .map(|peer| &peer.addr)
     }
 
+    pub fn addr_mut(&mut self, id: DeviceId) -> Option<&mut Addr> {
+        self.peers
+            .iter_mut()
+            .find(|peer| peer.dev.id() == id)
+            .map(|peer| &mut peer.addr)
+    }
+
     pub fn remove(&mut self, id: DeviceId) {
         self.peers.retain(|peer| peer.dev.id() != id);
     }

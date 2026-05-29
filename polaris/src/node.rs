@@ -198,7 +198,8 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             MessageType::Heartbeat => {
                 if let Ok(packet) = Packet::<HeartbeatMessage>::ref_from_bytes(raw) {
                     let heartbeat = &packet.payload;
-                    self.process_heartbeat(heartbeat, now).map(|_| (None, None))
+                    self.process_heartbeat(heartbeat, addr, now)
+                        .map(|_| (None, None))
                 } else {
                     Err(NodeError::InvalidMessage)
                 }
@@ -256,10 +257,21 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         Ok(NodeEvent::PeerDiscovered(msg.dev))
     }
 
-    fn process_heartbeat(&mut self, msg: &HeartbeatMessage, now: u32) -> Result<(), NodeError> {
+    fn process_heartbeat(
+        &mut self,
+        msg: &HeartbeatMessage,
+        addr: Addr,
+        now: u32,
+    ) -> Result<(), NodeError> {
+        let Some(known_addr) = self.registry.addr_mut(msg.from) else {
+            return Err(NodeError::Registry(RegistryError::PeerNotRegistered));
+        };
+        *known_addr = addr;
+
         self.registry
             .update_peer_seen(msg.from, now)
             .map_err(NodeError::Registry)?;
+
         Ok(())
     }
 }

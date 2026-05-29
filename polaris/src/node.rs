@@ -203,6 +203,15 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
                     Err(NodeError::InvalidMessage)
                 }
             }
+            MessageType::Welcome => {
+                if let Ok(packet) = Packet::<WelcomeMessage>::ref_from_bytes(raw) {
+                    let welcome = &packet.payload;
+                    self.process_welcome(welcome, addr, now)
+                        .map(|a| (Some(a), None))
+                } else {
+                    Err(NodeError::InvalidMessage)
+                }
+            }
             _ => todo!(),
         }
     }
@@ -233,6 +242,18 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         };
 
         Ok((event, action))
+    }
+
+    fn process_welcome(
+        &mut self,
+        msg: &WelcomeMessage,
+        addr: Addr,
+        now: u32,
+    ) -> Result<NodeEvent, NodeError> {
+        let peer = Peer::new(msg.dev, addr, now, msg.heartbeat_interval);
+        self.registry.add_peer(peer).map_err(NodeError::Registry)?;
+
+        Ok(NodeEvent::PeerDiscovered(msg.dev))
     }
 
     fn process_heartbeat(&mut self, msg: &HeartbeatMessage, now: u32) -> Result<(), NodeError> {

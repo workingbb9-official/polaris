@@ -4,8 +4,7 @@ use polaris::{Node, NodeAction, NodeEvent};
 fn main() {
     let mut sim = Simulation::new();
     sim.connect(sim.nodes[0].id, sim.nodes[1].id);
-
-    assert_eq!(sim.nodes[0].connections[0], sim.nodes[1].id);
+    sim.tick(10);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,8 +71,48 @@ impl Simulation {
             self.nodes[node1.0].receive(&msg, node2);
         }
     }
+
+    fn tick(&mut self, time: u32) {
+        for node in &mut self.nodes {
+            node.uptime += time;
+        }
+    }
 }
 
 fn dev(id: u16) -> Device {
     Device::new(DeviceId::new(id), DeviceType::new(20))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_connect_nodes() {
+        let mut sim = Simulation::new();
+        sim.connect(sim.nodes[0].id, sim.nodes[1].id);
+
+        assert_eq!(sim.nodes[0].connections[0], sim.nodes[1].id);
+    }
+
+    #[test]
+    fn test_node_uptime() {
+        let mut sim = Simulation::new();
+
+        for node in &sim.nodes {
+            assert_eq!(node.uptime, 0);
+        }
+
+        sim.tick(10);
+
+        for node in &sim.nodes {
+            assert_eq!(node.uptime, 10);
+        }
+
+        sim.nodes.push(SimNode::new(6, 1000));
+        assert_eq!(sim.nodes[5].uptime, 0);
+
+        sim.tick(10);
+        assert_eq!(sim.nodes[5].uptime, 10);
+    }
 }

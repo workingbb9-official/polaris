@@ -3,8 +3,23 @@ use polaris::{Node, NodeAction, NodeEvent};
 
 fn main() {
     let mut sim = Simulation::new();
-    sim.connect(sim.nodes[0].id, sim.nodes[1].id);
     sim.tick(10);
+
+    let node1_id = sim.nodes[0].id;
+
+    let hello = sim.nodes[0].inner.create_hello();
+    sim.nodes[1].receive(&hello, node1_id);
+
+    if let Some(NodeAction::SendWelcome { msg, .. }) = sim.nodes[1].pop_action() {
+        let node2_id = sim.nodes[1].id;
+
+        sim.nodes[0].receive(&msg, node2_id);
+        assert!(matches!(
+            sim.nodes[0].pop_event(),
+            Some(NodeEvent::PeerDiscovered { .. })
+        ));
+        assert_eq!(sim.nodes[0].connections[0], node2_id);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,8 +29,10 @@ struct NodeId(usize);
 struct SimNode {
     inner: polaris::Node<NodeId, 20>,
     id: NodeId,
-    connections: Vec<NodeId>,
     uptime: u32,
+    events: heapless::Vec<NodeEvent, 8>,
+    actions: heapless::Vec<NodeAction, 8>,
+    connections: Vec<NodeId>,
 }
 
 impl SimNode {
@@ -24,24 +41,45 @@ impl SimNode {
         Self {
             inner: node,
             id: NodeId(id as usize),
-            connections: Vec::new(),
             uptime: 0,
+            events: heapless::Vec::new(),
+            actions: heapless::Vec::new(),
+            connections: Vec::new(),
         }
     }
 
-    fn receive(&mut self, buf: &[u8], id: NodeId) -> Option<NodeAction> {
-        match self.inner.process_msg(buf, id, self.uptime).unwrap() {
-            (Some(NodeEvent::PeerDiscovered(_)), Some(action)) => {
+    // Return value represents if event or action was pushed
+    fn receive(&mut self, buf: &[u8], id: NodeId) -> (bool, bool) {
+        let mut ev = false;
+        let mut act = false;
+
+        let (event, action) = self.inner.process_msg(buf, id, self.uptime).unwrap();
+
+        if let Some(e) = event {
+            if let NodeEvent::PeerDiscovered(_) = e {
                 self.connections.push(id);
-                Some(action)
             }
-            (Some(NodeEvent::PeerDiscovered(_)), None) => {
-                self.connections.push(id);
-                None
-            }
-            (_, Some(action)) => Some(action),
-            (_, None) => None,
+
+            self.events.push(e).expect("Buffer should be flushed");
+            ev = true;
         }
+
+        if let Some(a) = action {
+            self.actions.push(a).expect("Buffer should be flushed");
+            act = true;
+        }
+
+        (ev, act)
+    }
+
+    #[inline]
+    fn pop_event(&mut self) -> Option<NodeEvent> {
+        self.events.pop()
+    }
+
+    #[inline]
+    fn pop_action(&mut self) -> Option<NodeAction> {
+        self.actions.pop()
     }
 }
 
@@ -62,16 +100,6 @@ impl Simulation {
         Self { nodes }
     }
 
-    fn connect(&mut self, node1: NodeId, node2: NodeId) {
-        let hello = self.nodes[node1.0].inner.create_hello();
-
-        if let Some(NodeAction::SendWelcome { msg, .. }) =
-            self.nodes[node2.0].receive(&hello, node1)
-        {
-            self.nodes[node1.0].receive(&msg, node2);
-        }
-    }
-
     fn tick(&mut self, time: u32) {
         for node in &mut self.nodes {
             node.uptime += time;
@@ -88,11 +116,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_connect_nodes() {
+    fn test_node_hello() {
         let mut sim = Simulation::new();
-        sim.connect(sim.nodes[0].id, sim.nodes[1].id);
+        let node1_id = sim.nodes[0].id;
 
-        assert_eq!(sim.nodes[0].connections[0], sim.nodes[1].id);
+        let hello = sim.nodes[0].inner.create_hello();
+        sim.nodes[1].receive(&hello, node1_id);
+
+        assert!(matches!(
+            sim.nodes[1].pop_action(),
+            Some(NodeAction::SendWelcome { .. })
+        ));
+
+        assert!(matches!(
+            sim.nodes[1].pop_event(),
+            Some(NodeEvent::PeerDiscovered { .. })
+        ));
     }
 
     #[test]

@@ -39,33 +39,30 @@ impl SimNode {
         }
     }
 
-    // Return value represents if event or action was pushed
-    fn receive(&mut self, buf: &[u8], id: NodeId) -> (bool, bool) {
-        let mut ev = false;
-        let mut act = false;
-
+    fn receive(&mut self, buf: &[u8], id: NodeId) {
         let (event, action) = self.inner.process_msg(buf, id, self.uptime).unwrap();
 
         if let Some(e) = event {
-            if let NodeEvent::PeerDiscovered(_) = e {
+            if let NodeEvent::PeerDiscovered { .. } = e {
                 self.connections.push(id);
             }
 
-            self.events.push(e).expect("Buffer should be flushed");
-            ev = true;
+            println!("Event on {}: {:?}", self.id.0, e);
         }
 
         if let Some(a) = action {
             self.actions.push(a).expect("Buffer should be flushed");
-            act = true;
         }
-
-        (ev, act)
     }
 
-    #[inline]
-    fn pop_event(&mut self) -> Option<NodeEvent> {
-        self.events.pop()
+    fn update(&mut self, elapsed: u32) {
+        self.uptime += elapsed;
+        self.inner
+            .tick(self.uptime, &mut self.events, &mut self.actions);
+
+        if let Some(e) = self.events.pop() {
+            println!("Event on {}: {:?}", self.id.0, e);
+        }
     }
 
     #[inline]
@@ -95,14 +92,10 @@ impl Simulation {
         let mut actions = Vec::new();
 
         for node in &mut self.nodes {
-            node.uptime += time;
+            node.update(time);
 
-            if let Some(event) = node.pop_event() {
-                println!("Event: {:?}", event);
-            }
-
-            if let Some(action) = node.pop_action() {
-                actions.push((node.id, action));
+            if let Some(a) = node.pop_action() {
+                actions.push((node.id, a));
             }
         }
 
@@ -118,7 +111,11 @@ impl Simulation {
                 self.nodes[to as usize].receive(&msg, from);
                 println!("Nodes {} and {} connected", to, from.0);
             }
-            _ => todo!(),
+            NodeAction::SendHeartbeat { dev, msg } => {
+                let to = dev.id().value();
+                self.nodes[to as usize].receive(&msg, from);
+                println!("Heartbeat sent to {} from {}", to, from.0);
+            }
         }
     }
 
@@ -150,11 +147,6 @@ mod tests {
             sim.nodes[1].pop_action(),
             Some(NodeAction::SendWelcome { .. })
         ));
-
-        assert!(matches!(
-            sim.nodes[1].pop_event(),
-            Some(NodeEvent::PeerDiscovered { .. })
-        ));
     }
 
     #[test]
@@ -164,11 +156,8 @@ mod tests {
 
         sim.tick(10);
 
-        // Check that welcome message was sent to node 0
-        assert!(matches!(
-            sim.nodes[0].pop_event(),
-            Some(NodeEvent::PeerDiscovered { .. })
-        ));
+        // Ensure welcome packet was sent back to node 0
+        assert_eq!(sim.nodes[0].connections[0], sim.nodes[1].id);
     }
 
     #[test]

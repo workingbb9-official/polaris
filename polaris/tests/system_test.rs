@@ -153,54 +153,6 @@ fn multiple_peers_receive_heartbeat_actions() {
     }
 }
 
-/*#[test]
-fn peer_can_timeout_while_others_remain_active() {
-    let local = dev(1);
-
-    let peer_a = dev(2);
-    let peer_b = dev(3);
-
-    let mut node: Node<&str, 8> = Node::new(local, 1000);
-
-    for peer in [peer_a, peer_b] {
-        let hello = Packet::new(
-            MessageType::Hello,
-            HelloMessage {
-                dev: peer,
-                heartbeat_interval: 1000,
-            },
-        );
-
-        node.process_msg(hello.as_bytes(), "peer", 0)
-            .expect("registration should succeed");
-    }
-
-    let heartbeat = Packet::new(
-        MessageType::Heartbeat,
-        HeartbeatMessage { from: peer_b.id() },
-    );
-
-    node.process_msg(heartbeat.as_bytes(), "peer", 2500)
-        .expect("heartbeat should succeed");
-
-    let mut events: Vec<NodeEvent, 8> = Vec::new();
-    let mut actions: Vec<NodeAction, 8> = Vec::new();
-
-    node.tick(4000, &mut events, &mut actions);
-
-    assert_eq!(events.len(), 1);
-
-    match &events[0] {
-        NodeEvent::PeerTimedOut(dev) => {
-            assert_eq!(*dev, peer_a);
-        }
-        _ => panic!("expected timeout"),
-    }
-
-    assert!(node.addr(peer_a.id()).is_none());
-    assert!(node.addr(peer_b.id()).is_some());
-} */
-
 #[test]
 fn invalid_message_type_is_rejected() {
     let local = dev(1);

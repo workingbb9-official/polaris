@@ -30,7 +30,7 @@ pub enum NodeEvent {
     PeerTimedOut(Device),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NodeAction {
     /// Send out a heartbeat message to a peer. This ensures that the peer does not disconnect
     /// from the node. The [DeviceId] within 'dev' can be used to find the address of the peer.

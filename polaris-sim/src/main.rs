@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 workingbb9-official
+
+#![allow(dead_code)]
+
 use polaris::{Device, DeviceId, DeviceType};
 use polaris::{Node, NodeAction, NodeEvent};
 
@@ -5,21 +10,7 @@ fn main() {
     let mut sim = Simulation::new();
     sim.tick(10);
 
-    let node1_id = sim.nodes[0].id;
-
-    let hello = sim.nodes[0].inner.create_hello();
-    sim.nodes[1].receive(&hello, node1_id);
-
-    if let Some(NodeAction::SendWelcome { msg, .. }) = sim.nodes[1].pop_action() {
-        let node2_id = sim.nodes[1].id;
-
-        sim.nodes[0].receive(&msg, node2_id);
-        assert!(matches!(
-            sim.nodes[0].pop_event(),
-            Some(NodeEvent::PeerDiscovered { .. })
-        ));
-        assert_eq!(sim.nodes[0].connections[0], node2_id);
-    }
+    sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +96,16 @@ impl Simulation {
             node.uptime += time;
         }
     }
+
+    fn send_hello(&mut self, from: NodeId, to: NodeId) {
+        let hello = self.nodes[from.0].inner.create_hello();
+        self.nodes[to.0].receive(&hello, from);
+    }
+
+    fn send_data(&mut self, buf: &[u8], from: NodeId, to: NodeId) {
+        let data = self.nodes[from.0].inner.create_data(buf);
+        self.nodes[to.0].receive(&data, from);
+    }
 }
 
 fn dev(id: u16) -> Device {
@@ -118,10 +119,7 @@ mod tests {
     #[test]
     fn test_node_hello() {
         let mut sim = Simulation::new();
-        let node1_id = sim.nodes[0].id;
-
-        let hello = sim.nodes[0].inner.create_hello();
-        sim.nodes[1].receive(&hello, node1_id);
+        sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
 
         assert!(matches!(
             sim.nodes[1].pop_action(),

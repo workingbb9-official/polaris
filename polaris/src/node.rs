@@ -2,7 +2,7 @@
 // Copyright (c) 2026 workingbb9-official
 
 use crate::device::{DEVICE_ID_LEN, Device, DeviceId};
-use crate::peer::Peer;
+use crate::peer::{Peer, PeerInfo};
 use crate::protocol::{
     DataMessage, HeartbeatMessage, HelloMessage, MessageType, Packet, WelcomeMessage,
 };
@@ -90,6 +90,12 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
     #[inline]
     pub fn msg_sent(&mut self, id: DeviceId, now: u32) -> Result<(), RegistryError> {
         self.registry.update_peer_sent(id, now)
+    }
+
+    /// Access the [PeerInfo] for all registered peers.
+    #[inline]
+    pub fn peers(&self) -> impl Iterator<Item = PeerInfo<'_, Addr>> {
+        self.registry.peers().map(Peer::info)
     }
 
     /// Construct a hello packet.

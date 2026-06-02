@@ -3,6 +3,14 @@
 
 use crate::device::Device;
 
+/// Useful information about a peer.
+#[derive(Debug)]
+pub struct PeerInfo<'a, Addr> {
+    pub dev: Device,
+    pub addr: &'a Addr,
+    pub last_seen: u32,
+}
+
 #[derive(Debug)]
 pub(crate) struct Peer<Addr> {
     pub dev: Device,
@@ -20,6 +28,14 @@ impl<Addr> Peer<Addr> {
             last_seen_ms: now,
             last_sent_ms: now,
             timeout_ms,
+        }
+    }
+
+    pub fn info(&self) -> PeerInfo<'_, Addr> {
+        PeerInfo {
+            dev: self.dev,
+            addr: &self.addr,
+            last_seen: self.last_seen_ms,
         }
     }
 

@@ -25,6 +25,11 @@ impl<Addr, const MAX_PEERS: usize> PeerRegistry<Addr, MAX_PEERS> {
         Self { peers: Vec::new() }
     }
 
+    #[inline]
+    pub fn peers(&self) -> impl Iterator<Item = &Peer<Addr>> {
+        self.peers.iter()
+    }
+
     pub fn add_peer(&mut self, peer: Peer<Addr>) -> Result<(), RegistryError> {
         let id = peer.dev.id();
 

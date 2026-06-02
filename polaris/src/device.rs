@@ -9,12 +9,12 @@ pub(crate) const DEVICE_ID_LEN: usize = 2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Device {
     id: DeviceId,
-    dev_type: DeviceType,
+    kind: DeviceType,
 }
 
 impl Device {
-    pub fn new(id: DeviceId, dev_type: DeviceType) -> Self {
-        Self { id, dev_type }
+    pub fn new(id: DeviceId, kind: DeviceType) -> Self {
+        Self { id, kind }
     }
 
     /// Access the [DeviceId].
@@ -25,8 +25,8 @@ impl Device {
 
     /// Access the [DeviceType].
     #[inline]
-    pub fn dev_type(&self) -> DeviceType {
-        self.dev_type
+    pub fn kind(&self) -> DeviceType {
+        self.kind
     }
 }
 

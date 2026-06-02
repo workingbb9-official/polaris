@@ -8,9 +8,9 @@ use polaris::{Node, NodeAction, NodeEvent};
 
 fn main() {
     let mut sim = Simulation::new();
-    sim.tick(10);
-
     sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
+
+    sim.tick(10);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,8 +92,33 @@ impl Simulation {
     }
 
     fn tick(&mut self, time: u32) {
+        let mut actions = Vec::new();
+
         for node in &mut self.nodes {
             node.uptime += time;
+
+            if let Some(event) = node.pop_event() {
+                println!("Event: {:?}", event);
+            }
+
+            if let Some(action) = node.pop_action() {
+                actions.push((node.id, action));
+            }
+        }
+
+        for (from, action) in actions {
+            self.handle_action(from, action);
+        }
+    }
+
+    fn handle_action(&mut self, from: NodeId, action: NodeAction) {
+        match action {
+            NodeAction::SendWelcome { dev, msg } => {
+                let to = dev.id().value();
+                self.nodes[to as usize].receive(&msg, from);
+                println!("Nodes {} and {} connected", to, from.0);
+            }
+            _ => todo!(),
         }
     }
 
@@ -128,6 +153,20 @@ mod tests {
 
         assert!(matches!(
             sim.nodes[1].pop_event(),
+            Some(NodeEvent::PeerDiscovered { .. })
+        ));
+    }
+
+    #[test]
+    fn test_node_tick() {
+        let mut sim = Simulation::new();
+        sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
+
+        sim.tick(10);
+
+        // Check that welcome message was sent to node 0
+        assert!(matches!(
+            sim.nodes[0].pop_event(),
             Some(NodeEvent::PeerDiscovered { .. })
         ));
     }

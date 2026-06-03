@@ -26,7 +26,8 @@ pub enum NodeEvent {
     /// also be returned by the library to identify where the data is coming from.
     PeerDiscovered(Device),
     /// A peer has not sent a heartbeat message within the pre-determined time. It will be removed
-    /// from the internal registry.
+    /// from the internal registry. By default, the timeout duration is 3 times the heartbeat
+    /// interval specified during discovery.
     PeerTimedOut(Device),
 }
 
@@ -176,6 +177,13 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         }
     }
 
+    /// Process a raw message received from another node.
+    ///
+    /// # Outcomes
+    /// * Hello: Add as peer, return '(NodeEvent::PeerDiscovered, NodeAction::SendWelcome)'.
+    /// * Welcome: Add as peer, return '(NodeEvent::PeerDiscovered, None)'.
+    /// * Heartbeat: Update last seen for peer, return (None, None).
+    /// * Data: Update last seen for peer, return '(NodeAction::DataReceived, None)'.
     pub fn process_msg(
         &mut self,
         raw: &[u8],

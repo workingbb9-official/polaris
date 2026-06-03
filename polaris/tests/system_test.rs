@@ -106,8 +106,8 @@ fn node_times_out_peer_after_missing_heartbeats() {
     let mut events: Vec<NodeEvent, 8> = Vec::new();
     let mut actions: Vec<NodeAction, 8> = Vec::new();
 
-    // Assumes peer timeout after ~3 missed intervals.
-    node.tick(4000, &mut events, &mut actions);
+    // Peer timeout after 3 missed heartbeats.
+    node.tick(1500, &mut events, &mut actions);
 
     assert_eq!(events.len(), 1);
 
@@ -179,4 +179,25 @@ fn empty_message_is_rejected() {
         .expect_err("empty message should fail");
 
     assert_eq!(err, NodeError::InvalidMessage);
+}
+
+#[test]
+fn connected_after_missed_heartbeat() {
+    let local = dev(1);
+    let remote = dev(2);
+
+    let mut node: Node<&str, 8> = Node::new(local, 1000);
+    let peer: Node<&str, 8> = Node::new(remote, 1000);
+
+    let hello = peer.create_hello();
+    node.process_msg(hello.as_bytes(), "192.168.0.22", 0)
+        .unwrap();
+
+    let mut events: Vec<NodeEvent, 8> = Vec::new();
+    let mut actions: Vec<NodeAction, 8> = Vec::new();
+
+    // 2 missed heartbeats
+    node.tick(2000, &mut events, &mut actions);
+
+    assert_eq!(node.peers().count(), 1);
 }

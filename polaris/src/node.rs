@@ -237,7 +237,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         addr: Addr,
         now: u32,
     ) -> Result<(NodeEvent, NodeAction), NodeError> {
-        let peer = Peer::new(msg.dev, addr, now, msg.heartbeat_interval);
+        let peer = Peer::new(msg.dev, addr, now, msg.heartbeat_interval * 3);
         self.registry.add_peer(peer).map_err(NodeError::Registry)?;
 
         let welcome = WelcomeMessage {
@@ -265,7 +265,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         addr: Addr,
         now: u32,
     ) -> Result<NodeEvent, NodeError> {
-        let peer = Peer::new(msg.dev, addr, now, msg.heartbeat_interval);
+        let peer = Peer::new(msg.dev, addr, now, msg.heartbeat_interval * 3);
         self.registry.add_peer(peer).map_err(NodeError::Registry)?;
 
         Ok(NodeEvent::PeerDiscovered(msg.dev))

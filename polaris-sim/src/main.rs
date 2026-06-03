@@ -11,6 +11,7 @@ fn main() {
     sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
 
     sim.tick(10);
+    sim.tick(1000);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,0 +1,11 @@
+<script type="module">
+    import init, { Simulation } from './pkg/polaris_sim.js';
+
+    await init();
+    const sim = new Simulation();
+
+    console.log(sim.frame());   // should see nodes JSON
+    sim.send_hello(0, 1);
+    sim.tick(10);
+    console.log(sim.frame());   // node 0 and 1 should be connected
+</script>

@@ -6,4 +6,4 @@ license.workspace = true
 
 [dependencies]
 heapless = { workspace = true }
-zerocopy = { workspace = true }
+zerocopy = { version = "0.8.48", default-features = false, features = ["derive"] }

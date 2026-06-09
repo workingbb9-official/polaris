@@ -5,19 +5,11 @@
 
 use polaris::{Device, DeviceId, DeviceType};
 use polaris::{Node, NodeAction, NodeEvent};
-
-fn main() {
-    let mut sim = Simulation::new();
-    sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
-
-    sim.tick(10);
-    sim.tick(1000);
-}
+use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct NodeId(usize);
 
-#[derive(Debug)]
 struct SimNode {
     inner: polaris::Node<NodeId, 20>,
     id: NodeId,
@@ -25,6 +17,19 @@ struct SimNode {
     events: heapless::Vec<NodeEvent, 8>,
     actions: heapless::Vec<NodeAction, 8>,
     connections: Vec<NodeId>,
+}
+
+impl serde::Serialize for SimNode {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = s.serialize_struct("SimNode", 2)?;
+        state.serialize_field("id", &self.id.0)?;
+        state.serialize_field(
+            "connections",
+            &self.connections.iter().map(|c| c.0).collect::<Vec<_>>(),
+        )?;
+        state.end()
+    }
 }
 
 impl SimNode {
@@ -37,6 +42,13 @@ impl SimNode {
             events: heapless::Vec::new(),
             actions: heapless::Vec::new(),
             connections: Vec::new(),
+        }
+    }
+
+    fn frame(&self) -> NodeFrame {
+        NodeFrame {
+            id: self.id.0,
+            connections: self.connections.iter().map(|id| id.0).collect(),
         }
     }
 
@@ -72,13 +84,21 @@ impl SimNode {
     }
 }
 
-#[derive(Debug)]
-struct Simulation {
+#[derive(serde::Serialize)]
+struct NodeFrame {
+    id: usize,
+    connections: Vec<usize>,
+}
+
+#[wasm_bindgen]
+pub(crate) struct Simulation {
     nodes: Vec<SimNode>,
 }
 
+#[wasm_bindgen]
 impl Simulation {
-    fn new() -> Self {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
         let nodes: Vec<SimNode> = Vec::new();
         let mut sim = Self { nodes };
 
@@ -87,12 +107,16 @@ impl Simulation {
         sim
     }
 
-    fn spawn_node(&mut self) {
+    pub fn frame(&self) -> String {
+        serde_json::to_string(&self.nodes).unwrap()
+    }
+
+    pub fn spawn_node(&mut self) {
         let node = SimNode::new(self.nodes.len() as u16, 1000);
         self.nodes.push(node);
     }
 
-    fn tick(&mut self, time: u32) {
+    pub fn tick(&mut self, time: u32) {
         let mut actions = Vec::new();
 
         for node in &mut self.nodes {
@@ -113,24 +137,22 @@ impl Simulation {
             NodeAction::SendWelcome { dev, msg } => {
                 let to = dev.id().value();
                 self.nodes[to as usize].receive(&msg, from);
-                println!("Nodes {} and {} connected", to, from.0);
             }
             NodeAction::SendHeartbeat { dev, msg } => {
                 let to = dev.id().value();
                 self.nodes[to as usize].receive(&msg, from);
-                println!("Heartbeat sent to {} from {}", to, from.0);
             }
         }
     }
 
-    fn send_hello(&mut self, from: NodeId, to: NodeId) {
-        let hello = self.nodes[from.0].inner.create_hello();
-        self.nodes[to.0].receive(&hello, from);
+    pub fn send_hello(&mut self, from: u32, to: u32) {
+        let hello = self.nodes[from as usize].inner.create_hello();
+        self.nodes[to as usize].receive(&hello, NodeId(from as usize));
     }
 
-    fn send_data(&mut self, buf: &[u8], from: NodeId, to: NodeId) {
-        let data = self.nodes[from.0].inner.create_data(buf);
-        self.nodes[to.0].receive(&data, from);
+    pub fn send_data(&mut self, buf: &[u8], from: u32, to: u32) {
+        let data = self.nodes[from as usize].inner.create_data(buf);
+        self.nodes[to as usize].receive(&data, NodeId(from as usize));
     }
 }
 
@@ -145,7 +167,7 @@ mod tests {
     #[test]
     fn test_node_hello() {
         let mut sim = Simulation::new();
-        sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
+        sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
 
         assert!(matches!(
             sim.nodes[1].pop_action(),
@@ -156,7 +178,7 @@ mod tests {
     #[test]
     fn test_node_tick() {
         let mut sim = Simulation::new();
-        sim.send_hello(sim.nodes[0].id, sim.nodes[1].id);
+        sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
 
         sim.tick(10);
 

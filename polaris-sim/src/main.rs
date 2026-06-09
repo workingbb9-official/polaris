@@ -79,14 +79,17 @@ struct Simulation {
 
 impl Simulation {
     fn new() -> Self {
-        let mut nodes: Vec<SimNode> = Vec::new();
+        let nodes: Vec<SimNode> = Vec::new();
+        let mut sim = Self { nodes };
 
-        for i in 0..5 {
-            let sim_node = SimNode::new(i as u16, 1000);
-            nodes.push(sim_node);
-        }
+        sim.spawn_node();
+        sim.spawn_node();
+        sim
+    }
 
-        Self { nodes }
+    fn spawn_node(&mut self) {
+        let node = SimNode::new(self.nodes.len() as u16, 1000);
+        self.nodes.push(node);
     }
 
     fn tick(&mut self, time: u32) {
@@ -175,10 +178,10 @@ mod tests {
             assert_eq!(node.uptime, 10);
         }
 
-        sim.nodes.push(SimNode::new(6, 1000));
-        assert_eq!(sim.nodes[5].uptime, 0);
+        sim.spawn_node();
+        assert_eq!(sim.nodes[2].uptime, 0);
 
         sim.tick(10);
-        assert_eq!(sim.nodes[5].uptime, 10);
+        assert_eq!(sim.nodes[2].uptime, 10);
     }
 }

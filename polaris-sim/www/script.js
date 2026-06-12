@@ -5,10 +5,16 @@ async function run() {
     const sim = new Simulation();
     console.log("Simulation created");
 
-    const button = document.getElementById("tick");
-    button.addEventListener("click", () => {
+    const tick = document.getElementById("tick");
+    tick.addEventListener("click", () => {
         sim.tick(10);
         console.log(sim.frame());
+    });
+
+    const spawn = document.getElementById("spawn");
+    spawn.addEventListener("click", () => {
+        sim.spawn_node();
+        console.log("Node spawned");
     });
 }
 

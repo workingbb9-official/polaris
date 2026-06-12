@@ -1,11 +1,13 @@
-<script type="module">
-    import init, { Simulation } from './pkg/polaris_sim.js';
-
-    await init();
-    const sim = new Simulation();
-
-    console.log(sim.frame());   // should see nodes JSON
-    sim.send_hello(0, 1);
-    sim.tick(10);
-    console.log(sim.frame());   // node 0 and 1 should be connected
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic JS Button</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <button id="tick">Click Me</button>
+    <script type="module" src="script.js"></script>
+</body>
+</html>

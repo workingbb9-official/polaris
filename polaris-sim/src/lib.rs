@@ -73,7 +73,7 @@ impl SimNode {
         self.inner
             .tick(self.uptime, &mut self.events, &mut self.actions);
 
-        if let Some(e) = self.events.pop() {
+        while let Some(e) = self.events.pop() {
             println!("Event on {}: {:?}", self.id.0, e);
         }
     }
@@ -122,7 +122,7 @@ impl Simulation {
         for node in &mut self.nodes {
             node.update(time);
 
-            if let Some(a) = node.pop_action() {
+            while let Some(a) = node.pop_action() {
                 actions.push((node.id, a));
             }
         }

@@ -3,12 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polaris simulation</title>
+    <title>Polaris Simulation</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <button id="tick">Tick</button>
-    <button id="spawn">Spawn node</button>
-    <script type="module" src="script.js"></script>
+    <div class="main">
+        <canvas id="canvas"></canvas>
+
+        <div class="sidebar">
+            <div class="top-controls">
+                <h2>Commands</h2>
+                <div class="button-group">
+                    <button id="tick" class="btn btn-secondary">Tick</button>
+                    <button id="spawn" class="btn btn-primary">Spawn Node</button>
+                </div>
+            </div>
+
+            <div class="event-container">
+                <h3 class="event-title">Last Event</h3>
+                <div id="event-box">---</div>
+            </div>
+        </div>
+
+        <script type="module" src="script.js"></script>
+    </div>
 </body>
 </html>

@@ -1,10 +1,15 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
 
+let sim = null;
+
 async function run() {
     await init();
-    const sim = new Simulation();
+    sim = new Simulation();
+    initEventListeners();
     console.log("Simulation created");
+}
 
+function initEventListeners() {
     const tick = document.getElementById("tick");
     tick.addEventListener("click", () => {
         sim.tick(10);

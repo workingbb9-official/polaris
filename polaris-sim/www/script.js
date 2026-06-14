@@ -64,9 +64,7 @@ function dropCircle(e) {
     circle.classList.add("node");
     circles.push(circle);
 
-    circle.addEventListener("click", () => {
-        console.log(`Node id: ${circle.dataset.id}`);
-    });
+    circle.addEventListener("click", () => displayInfo(circle.dataset.id));
 
     sim.spawn_node();
 
@@ -86,6 +84,19 @@ function cancelCircle(e) {
         window.removeEventListener("keydown", cancelCircle);
 
         newCircle = null;
+    }
+}
+
+function displayInfo(id) {
+    const node = sim.node_info(id);
+    const data = JSON.parse(node);
+    console.log(`Node ID: ${data.id}`);
+
+    const peers = data.connections;
+    if (data.connections.length == 0) {
+        console.log("Peers: None");
+    } else {
+        console.log(`Peers: ${data.connections}`);
     }
 }
 

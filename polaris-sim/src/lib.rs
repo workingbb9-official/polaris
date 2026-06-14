@@ -111,6 +111,10 @@ impl Simulation {
         serde_json::to_string(&self.nodes).unwrap()
     }
 
+    pub fn node_info(&self, id: u32) -> String {
+        serde_json::to_string(&self.nodes[id as usize]).unwrap()
+    }
+
     pub fn spawn_node(&mut self) {
         let node = SimNode::new(self.nodes.len() as u16, 1000);
         self.nodes.push(node);

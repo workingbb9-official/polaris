@@ -132,3 +132,7 @@ canvas {
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
+
+.node {
+    pointer-events: auto;
+}

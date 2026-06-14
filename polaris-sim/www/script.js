@@ -1,7 +1,8 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
 
 let sim = null;
-let circle = null;
+let newCircle = null;
+const circles = [];
 
 async function run() {
     await init();
@@ -22,13 +23,13 @@ function initEventListeners() {
 }
 
 function createCircle() {
-    if (circle) {
+    if (newCircle) {
         return;
     }
 
-    circle = document.createElement("div");
-    circle.classList.add("circle");
-    document.body.appendChild(circle);
+    newCircle = document.createElement("div");
+    newCircle.classList.add("circle");
+    document.body.appendChild(newCircle);
 
     window.addEventListener("mousemove", moveCircle);
     window.addEventListener("click", dropCircle);
@@ -36,16 +37,16 @@ function createCircle() {
 }
 
 function moveCircle(e) {
-    if (!circle) {
+    if (!newCircle) {
         return;
     }
 
-    circle.style.left = `${e.clientX}px`;
-    circle.style.top = `${e.clientY}px`;
+    newCircle.style.left = `${e.clientX}px`;
+    newCircle.style.top = `${e.clientY}px`;
 }
 
 function dropCircle(e) {
-    if (!circle) {
+    if (!newCircle) {
         return;
     }
 
@@ -53,28 +54,38 @@ function dropCircle(e) {
         return;
     }
 
-    circle.style.backgroundColor = "#cc5500";
+    newCircle.style.backgroundColor = "#cc5500";
     window.removeEventListener("mousemove", moveCircle);
     window.removeEventListener("click", dropCircle);
     window.removeEventListener("keydown", cancelCircle);
 
-    console.log("Node spawned");
+    const circle = newCircle;
+    circle.dataset.id = circles.length;
+    circle.classList.add("node");
+    circles.push(circle);
+
+    circle.addEventListener("click", () => {
+        console.log(`Node id: ${circle.dataset.id}`);
+    });
+
     sim.spawn_node();
-    circle = null;
+
+    console.log("Node spawned");
+    newCircle = null;
 }
 
 function cancelCircle(e) {
-    if (!circle) {
+    if (!newCircle) {
         return;
     }
 
     if (e.key == "Escape") {
-        circle.remove();
+        newCircle.remove();
         window.removeEventListener("mousemove", moveCircle);
         window.removeEventListener("click", dropCircle);
         window.removeEventListener("keydown", cancelCircle);
 
-        circle = null;
+        newCircle = null;
     }
 }
 

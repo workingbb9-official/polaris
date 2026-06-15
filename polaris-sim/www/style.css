@@ -8,7 +8,7 @@ body {
 
 .main {
     display: grid;
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: 350px 1fr 350px;
     height: 100vh;
     width: 100vw;
 }
@@ -49,6 +49,15 @@ canvas {
     border-bottom: 1px solid #334155;
 }
 
+#left-sidebar {
+    border-right: 1px solid #334155;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+#right-sidebar {
+    border-left: 1px solid #334155;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+}
 
 .button-group {
     display: flex;

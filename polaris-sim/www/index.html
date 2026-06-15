@@ -8,7 +8,15 @@
 </head>
 <body>
     <div class="main">
-        <div id="left-sidebar" class="sidebar"></div>
+        <div id="left-sidebar" class="sidebar">
+            <div class="sidebar-section">
+                <h2>Node Info</h2>
+                <div id="info-display" class="sidebar-content">
+                    <span class="placeholder-text">No node selected</span>
+                </div>
+            </div>
+        </div>
+
         <canvas id="canvas"></canvas>
 
         <div id="right-sidebar" class="sidebar">
@@ -21,7 +29,7 @@
             </div>
 
             <div class="event-container">
-                <h3 class="event-title">Last Event</h3>
+                <h3 class="inner-text">Last Event</h3>
                 <div id="event-box">---</div>
             </div>
         </div>

@@ -2,6 +2,7 @@ import init, { Simulation } from "../pkg/polaris_sim.js";
 
 let sim = null;
 let newCircle = null;
+let selectedCircle = null;
 const circles = [];
 
 async function run() {
@@ -20,6 +21,9 @@ function initEventListeners() {
 
     const spawn = document.getElementById("spawn");
     spawn.addEventListener("click", createCircle);
+
+    const canvas = document.getElementById("canvas");
+    canvas.addEventListener("click", deselectCircle);
 }
 
 function createCircle() {
@@ -64,9 +68,11 @@ function dropCircle(e) {
     circle.classList.add("node");
     circles.push(circle);
 
-    circle.addEventListener("click", () => displayInfo(circle.dataset.id));
+    circle.addEventListener("click", () => displayNodeInfo(circle));
 
     sim.spawn_node();
+
+    displayNodeInfo(circle);
 
     console.log("Node spawned");
     newCircle = null;
@@ -87,17 +93,40 @@ function cancelCircle(e) {
     }
 }
 
-function displayInfo(id) {
-    const node = sim.node_info(id);
+function displayNodeInfo(circle) {
+    const node = sim.node_info(circle.dataset.id);
     const data = JSON.parse(node);
-    console.log(`Node ID: ${data.id}`);
 
-    const peers = data.connections;
-    if (data.connections.length == 0) {
-        console.log("Peers: None");
-    } else {
-        console.log(`Peers: ${data.connections}`);
+    if (selectedCircle) {
+        selectedCircle.style.backgroundColor = "#cc5500";
     }
+
+    circle.style.backgroundColor = "#82af5f";
+    selectedCircle = circle;
+
+    const info = document.getElementById("info-display");
+    let html = `<div class="inner-text">ID: ${data.id}</div>`;
+
+    if (data.connections.length === 0) {
+        html += '<div class="inner-text">Peers: None</div>';
+    } else {
+        const peers = data.connections.join(' ');
+        html += `<div class="inner-text">Peers: ${peers}</div>`;
+    }
+
+    info.innerHTML = html;
+}
+
+function deselectCircle(e) {
+    if (!selectedCircle) {
+        return;
+    }
+
+    selectedCircle.style.backgroundColor = "#cc5500";
+    selectedCircle = null;
+
+    const info = document.getElementById("info-display");
+    info.innerHTML = '<span class="placeholder-text">No node selected</span>';
 }
 
 run();

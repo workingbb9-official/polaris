@@ -59,6 +59,37 @@ canvas {
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
 }
 
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sidebar h3 {
+    color: #94a3b8;
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    color: #cbd5e1;
+    font-size: 0.95rem;
+}
+
+.placeholder-text {
+    color: #64748b;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
 .button-group {
     display: flex;
     flex-direction: column;
@@ -109,7 +140,7 @@ canvas {
     width: 100%;
 }
 
-.event-title {
+.inner-text {
     color: #94a3b8;
     font-size: 0.85rem;
     font-weight: 600;

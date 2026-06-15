@@ -1,9 +1,9 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
 
 let sim = null;
-let newCircle = null;
-let selectedCircle = null;
-const circles = [];
+let newNode = null;
+let selectedNode = null;
+const nodes = [];
 
 async function run() {
     await init();
@@ -20,37 +20,44 @@ function initEventListeners() {
     });
 
     const spawn = document.getElementById("spawn");
-    spawn.addEventListener("click", createCircle);
+    spawn.addEventListener("click", createNode);
 
     const canvas = document.getElementById("canvas");
-    canvas.addEventListener("click", deselectCircle);
+    canvas.addEventListener("click", deselectNode);
+
+    document.body.addEventListener("click", (e) => {
+        const clickedNode = e.target.closest(".node");
+        if (clickedNode) {
+            displayNodeInfo(clickedNode);
+        }
+    });
 }
 
-function createCircle() {
-    if (newCircle) {
+function createNode() {
+    if (newNode) {
         return;
     }
 
-    newCircle = document.createElement("div");
-    newCircle.classList.add("circle");
-    document.body.appendChild(newCircle);
+    newNode = document.createElement("div");
+    newNode.classList.add("node", "preview");
+    document.body.appendChild(newNode);
 
-    window.addEventListener("mousemove", moveCircle);
-    window.addEventListener("click", dropCircle);
-    window.addEventListener("keydown", cancelCircle);
+    window.addEventListener("mousemove", moveNode);
+    window.addEventListener("click", dropNode);
+    window.addEventListener("keydown", cancelNode);
 }
 
-function moveCircle(e) {
-    if (!newCircle) {
+function moveNode(e) {
+    if (!newNode) {
         return;
     }
 
-    newCircle.style.left = `${e.clientX}px`;
-    newCircle.style.top = `${e.clientY}px`;
+    newNode.style.left = `${e.clientX}px`;
+    newNode.style.top = `${e.clientY}px`;
 }
 
-function dropCircle(e) {
-    if (!newCircle) {
+function dropNode(e) {
+    if (!newNode) {
         return;
     }
 
@@ -58,51 +65,45 @@ function dropCircle(e) {
         return;
     }
 
-    newCircle.style.backgroundColor = "#cc5500";
-    window.removeEventListener("mousemove", moveCircle);
-    window.removeEventListener("click", dropCircle);
-    window.removeEventListener("keydown", cancelCircle);
+    window.removeEventListener("mousemove", moveNode);
+    window.removeEventListener("click", dropNode);
+    window.removeEventListener("keydown", cancelNode);
 
-    const circle = newCircle;
-    circle.dataset.id = circles.length;
-    circle.classList.add("node");
-    circles.push(circle);
-
-    circle.addEventListener("click", () => displayNodeInfo(circle));
-
-    sim.spawn_node();
-
-    displayNodeInfo(circle);
+    const node = newNode;
+    node.classList.remove("preview");
+    node.dataset.id = nodes.length;
+    nodes.push(node);
 
     console.log("Node spawned");
-    newCircle = null;
+    sim.spawn_node();
+    newNode = null;
 }
 
-function cancelCircle(e) {
-    if (!newCircle) {
+function cancelNode(e) {
+    if (!newNode) {
         return;
     }
 
     if (e.key == "Escape") {
-        newCircle.remove();
-        window.removeEventListener("mousemove", moveCircle);
-        window.removeEventListener("click", dropCircle);
-        window.removeEventListener("keydown", cancelCircle);
+        newNode.remove();
+        window.removeEventListener("mousemove", moveNode);
+        window.removeEventListener("click", dropNode);
+        window.removeEventListener("keydown", cancelNode);
 
-        newCircle = null;
+        newNode = null;
     }
 }
 
-function displayNodeInfo(circle) {
-    const node = sim.node_info(circle.dataset.id);
-    const data = JSON.parse(node);
+function displayNodeInfo(node) {
+    const json = sim.node_info(node.dataset.id);
+    const data = JSON.parse(json);
 
-    if (selectedCircle) {
-        selectedCircle.style.backgroundColor = "#cc5500";
+    if (selectedNode) {
+        selectedNode.classList.remove("selected");
     }
 
-    circle.style.backgroundColor = "#82af5f";
-    selectedCircle = circle;
+    node.classList.add("selected");
+    selectedNode = node;
 
     const info = document.getElementById("info-display");
     let html = `<div class="inner-text">ID: ${data.id}</div>`;
@@ -117,13 +118,13 @@ function displayNodeInfo(circle) {
     info.innerHTML = html;
 }
 
-function deselectCircle(e) {
-    if (!selectedCircle) {
+function deselectNode(e) {
+    if (!selectedNode || e.target.closest(".node")) {
         return;
     }
 
-    selectedCircle.style.backgroundColor = "#cc5500";
-    selectedCircle = null;
+    selectedNode.classList.remove("selected");
+    selectedNode = null;
 
     const info = document.getElementById("info-display");
     info.innerHTML = '<span class="placeholder-text">No node selected</span>';

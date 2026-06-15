@@ -163,16 +163,21 @@ canvas {
     word-break: break-all;
 }
 
-.circle {
+.node {
     width: 50px;
     height: 50px;
-    background-color: #333333;
+    background-color: #cc5500;
     border-radius: 50%;
     position: absolute;
     transform: translate(-50%, -50%);
+    pointer-events: auto;
+}
+
+.node.preview {
+    background-color: #333333;
     pointer-events: none;
 }
 
-.node {
-    pointer-events: auto;
+.node.selected {
+    background-color: #85af5f;
 }

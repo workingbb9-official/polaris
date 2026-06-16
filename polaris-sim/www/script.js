@@ -33,11 +33,7 @@ function initEventListeners() {
     });
 
     const info = document.getElementById("info-display");
-    info.addEventListener("click", (e) => {
-        if (e.target.id === "send") {
-            console.log("Sending hello");
-        }
-    });
+    info.addEventListener("click", onInfoClick);
 }
 
 function createNode() {
@@ -134,8 +130,26 @@ function deselectNode(e) {
     selectedNode.classList.remove("selected");
     selectedNode = null;
 
+    const instruction = document.getElementById("select-node");
+    instruction.classList.remove("show");
+
     const info = document.getElementById("info-display");
     info.innerHTML = '<span class="placeholder-text">No node selected</span>';
+}
+
+function onInfoClick(e) {
+    if (e.target.id === "send" && selectedNode) {
+        console.log("Displaying instruction");
+        const instruction = document.getElementById("select-node");
+        instruction.classList.add("show");
+        sendHello();
+    }
+}
+
+function sendHello() {
+    if (!selectedNode) {
+        return;
+    }
 }
 
 run();

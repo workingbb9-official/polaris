@@ -181,3 +181,24 @@ canvas {
 .node.selected {
     background-color: #85af5f;
 }
+
+.hidden-instruction {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-family: sans-serif;
+    font-weight: bold;
+    pointer-events: none;
+    display: none;             
+}
+
+.hidden-instruction.show {
+    display: block;
+}

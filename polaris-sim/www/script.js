@@ -68,7 +68,7 @@ function dropNode(e) {
         return;
     }
 
-    if (e.target.tagName == "DIV" || e.target.tagName == "BUTTON") {
+    if (e.target.tagName === "DIV" || e.target.tagName === "BUTTON") {
         return;
     }
 
@@ -91,7 +91,7 @@ function cancelNode(e) {
         return;
     }
 
-    if (e.key == "Escape") {
+    if (e.key === "Escape") {
         newNode.remove();
         window.removeEventListener("mousemove", moveNode);
         window.removeEventListener("click", dropNode);

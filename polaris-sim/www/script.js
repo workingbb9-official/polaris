@@ -10,14 +10,12 @@ async function run() {
     await init();
     sim = new Simulation();
     initEventListeners();
-    console.log("Simulation created");
 }
 
 function initEventListeners() {
     const tick = document.getElementById("tick");
     tick.addEventListener("click", () => {
         sim.tick(10);
-        console.log(sim.frame());
     });
 
     const spawn = document.getElementById("spawn");
@@ -84,7 +82,6 @@ function dropNode(e) {
     node.dataset.id = nodes.length;
     nodes.push(node);
 
-    console.log("Node spawned");
     sim.spawn_node();
     newNode = null;
 }
@@ -120,9 +117,12 @@ function displayNodeInfo(node) {
 
     if (data.connections.length === 0) {
         html += '<div class="inner-text">Peers: None</div>';
+    } else if (data.connections.length === 1) {
+        const peer = data.connections[0];
+        html += `<div class="inner-text">Peer: Node ${peer}</div>`;
     } else {
-        const peers = data.connections.join(' ');
-        html += `<div class="inner-text">Peers: ${peers}</div>`;
+        const peers = data.connections.join(", ");
+        html += `<div class="inner-text">Peers: Nodes ${peers}</div>`;
     }
 
     html += '<button id="send" class="btn btn-primary">Send Hello</button>';
@@ -147,7 +147,6 @@ function deselectNode(e) {
 
 function onInfoClick(e) {
     if (e.target.id === "send" && selectedNode) {
-        console.log("Displaying instruction");
         const instruction = document.getElementById("select-node");
         instruction.classList.add("show");
         isSending = true;
@@ -159,7 +158,6 @@ function sendHello(to) {
         return;
     }
 
-    console.log("Sending hello");
     sim.send_hello(selectedNode.dataset.id, to.dataset.id);
     isSending = false;
 }

@@ -3,6 +3,7 @@ import init, { Simulation } from "../pkg/polaris_sim.js";
 let sim = null;
 let newNode = null;
 let selectedNode = null;
+let isSending = false;
 const nodes = [];
 
 async function run() {
@@ -27,7 +28,13 @@ function initEventListeners() {
 
     document.body.addEventListener("click", (e) => {
         const clickedNode = e.target.closest(".node");
-        if (clickedNode) {
+        if (!clickedNode) {
+            return;
+        }
+
+        if (isSending) {
+            sendHello(clickedNode);
+        } else {
             displayNodeInfo(clickedNode);
         }
     });
@@ -127,6 +134,7 @@ function deselectNode(e) {
         return;
     }
 
+    isSending = false;
     selectedNode.classList.remove("selected");
     selectedNode = null;
 
@@ -142,14 +150,18 @@ function onInfoClick(e) {
         console.log("Displaying instruction");
         const instruction = document.getElementById("select-node");
         instruction.classList.add("show");
-        sendHello();
+        isSending = true;
     }
 }
 
-function sendHello() {
+function sendHello(to) {
     if (!selectedNode) {
         return;
     }
+
+    console.log("Sending hello");
+    sim.send_hello(selectedNode.dataset.id, to.dataset.id);
+    isSending = false;
 }
 
 run();

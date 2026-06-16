@@ -31,6 +31,13 @@ function initEventListeners() {
             displayNodeInfo(clickedNode);
         }
     });
+
+    const info = document.getElementById("info-display");
+    info.addEventListener("click", (e) => {
+        if (e.target.id === "send") {
+            console.log("Sending hello");
+        }
+    });
 }
 
 function createNode() {
@@ -115,6 +122,7 @@ function displayNodeInfo(node) {
         html += `<div class="inner-text">Peers: ${peers}</div>`;
     }
 
+    html += '<button id="send" class="btn btn-primary">Send Hello</button>';
     info.innerHTML = html;
 }
 

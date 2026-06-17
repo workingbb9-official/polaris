@@ -1,165 +1,103 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
+import { NodeManager } from "./nodeManager.js";
 
 let sim = null;
-let newNode = null;
-let selectedNode = null;
 let isSending = false;
-const nodes = [];
+let nodeManager = null;
 
 async function run() {
     await init();
     sim = new Simulation();
+    nodeManager = new NodeManager();
     initEventListeners();
 }
 
 function initEventListeners() {
     const tick = document.getElementById("tick");
     tick.addEventListener("click", () => {
+        console.log("pressed");
         sim.tick(10);
     });
 
     const spawn = document.getElementById("spawn");
-    spawn.addEventListener("click", createNode);
+    spawn.addEventListener("click", handleSpawnClick);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyDown);
 
     const canvas = document.getElementById("canvas");
-    canvas.addEventListener("click", deselectNode);
+    canvas.addEventListener("click", handleCanvasClick);
 
-    document.body.addEventListener("click", (e) => {
-        const clickedNode = e.target.closest(".node");
-        if (!clickedNode) {
-            return;
-        }
-
-        if (isSending) {
-            sendHello(clickedNode);
-        } else {
-            displayNodeInfo(clickedNode);
-        }
-    });
+    document.body.addEventListener("click", handleDocumentClick);
 
     const info = document.getElementById("info-display");
-    info.addEventListener("click", onInfoClick);
+    info.addEventListener("click", handleInfoClick);
 }
 
-function createNode() {
-    if (newNode) {
-        return;
-    }
-
-    newNode = document.createElement("div");
-    newNode.classList.add("node", "preview");
-    document.body.appendChild(newNode);
-
-    window.addEventListener("mousemove", moveNode);
-    window.addEventListener("click", dropNode);
-    window.addEventListener("keydown", cancelNode);
-}
-
-function moveNode(e) {
-    if (!newNode) {
-        return;
-    }
-
-    newNode.style.left = `${e.clientX}px`;
-    newNode.style.top = `${e.clientY}px`;
-}
-
-function dropNode(e) {
-    if (!newNode) {
-        return;
-    }
-
-    if (e.target.tagName === "DIV" || e.target.tagName === "BUTTON") {
-        return;
-    }
-
-    window.removeEventListener("mousemove", moveNode);
-    window.removeEventListener("click", dropNode);
-    window.removeEventListener("keydown", cancelNode);
-
-    const node = newNode;
-    node.classList.remove("preview");
-    node.dataset.id = nodes.length;
-    nodes.push(node);
-
-    sim.spawn_node();
-    newNode = null;
-}
-
-function cancelNode(e) {
-    if (!newNode) {
-        return;
-    }
-
-    if (e.key === "Escape") {
-        newNode.remove();
-        window.removeEventListener("mousemove", moveNode);
-        window.removeEventListener("click", dropNode);
-        window.removeEventListener("keydown", cancelNode);
-
-        newNode = null;
+function handleSpawnClick() {
+    if (nodeManager.spawnPending()) {
+        console.log("Spawned");
     }
 }
 
-function displayNodeInfo(node) {
-    const json = sim.node_info(node.dataset.id);
-    const data = JSON.parse(json);
-
-    if (selectedNode) {
-        selectedNode.classList.remove("selected");
-    }
-
-    node.classList.add("selected");
-    selectedNode = node;
-
-    const info = document.getElementById("info-display");
-    let html = `<div class="inner-text">ID: ${data.id}</div>`;
-
-    if (data.connections.length === 0) {
-        html += '<div class="inner-text">Peers: None</div>';
-    } else if (data.connections.length === 1) {
-        const peer = data.connections[0];
-        html += `<div class="inner-text">Peer: Node ${peer}</div>`;
-    } else {
-        const peers = data.connections.join(", ");
-        html += `<div class="inner-text">Peers: Nodes ${peers}</div>`;
-    }
-
-    html += '<button id="send" class="btn btn-primary">Send Hello</button>';
-    info.innerHTML = html;
-}
-
-function deselectNode(e) {
-    if (!selectedNode || e.target.closest(".node")) {
-        return;
-    }
-
-    isSending = false;
-    selectedNode.classList.remove("selected");
-    selectedNode = null;
-
-    const instruction = document.getElementById("select-node");
-    instruction.classList.remove("show");
-
-    const info = document.getElementById("info-display");
-    info.innerHTML = '<span class="placeholder-text">No node selected</span>';
-}
-
-function onInfoClick(e) {
-    if (e.target.id === "send" && selectedNode) {
+function handleInfoClick(e) {
+    if (e.target.id === "send") {
+        isSending = true;
         const instruction = document.getElementById("select-node");
         instruction.classList.add("show");
-        isSending = true;
+    }
+
+}
+
+function handleMouseMove(e) {
+    if (nodeManager.movePending(e.clientX, e.clientY)) {
+        console.log("Moving");
+    }
+}
+
+function handleKeyDown(e) {
+    if (e.key === "Escape") {
+        if (nodeManager.cancelPending()) {
+            console.log("Canceled");
+        }
+    }
+}
+
+function handleCanvasClick() {
+    if (nodeManager.placePending()) {
+        console.log("Node placed");
+        sim.spawn_node();
+    }
+
+    if (nodeManager.deselectNode()) {
+        console.log("Node deselected");
+    }
+}
+
+function handleDocumentClick(e) {
+    const node = e.target.closest(".node");
+    if (!node) {
+        return;
+    }
+
+
+    if (isSending) {
+        sendHello(node);
+        isSending = false;
+
+    } else {
+        const json = sim.node_info(node.dataset.id);
+        const data = JSON.parse(json);
+
+        nodeManager.selectNode(node, data.id, data.connections);
     }
 }
 
 function sendHello(to) {
-    if (!selectedNode) {
-        return;
-    }
-
-    sim.send_hello(selectedNode.dataset.id, to.dataset.id);
+    sim.send_hello(nodeManager.selectedNode.dataset.id, to.dataset.id);
     isSending = false;
+    const instruction = document.getElementById("select-node");
+    instruction.classList.remove("show");
 }
 
 run();

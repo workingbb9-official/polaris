@@ -1,63 +1,84 @@
-export const nodeManager = {
-    selectedNode: null,
-    pendingNode: null,
+export const SimState = {
+    Default: "default",
+    Spawning: "spawning",
+    Selected: "selected",
+    SendingHello: "sending hello",
+};
+
+export const nodeStore = {
+    state: SimState.Default,
+    previewNodeId: null,
+    selectedNodeId: null,
     nodes: [],
 
-    spawnPending() {
-        if (this.pendingNode) {
-            return false;
-        }
+    startSpawning() {
+        this.previewNodeId = this.nodes.length;
+        this.state = SimState.Spawning;
+    },
 
+    createNode() {
+        this.nodes.push(this.previewNodeId);
+        this.previewNodeId = null;
+        this.state = SimState.Default;
+    },
+
+    cancelSpawning() {
+        this.previewNodeId = null;
+        this.state = SimState.Default;
+    },
+
+    selectNode(id) {
+        this.selectedNodeId = id;
+        this.state = SimState.Selected;
+    },
+
+    deselectNode() {
+        this.selectedNodeId = null;
+        this.state = SimState.Default;
+    },
+
+    startHello() {
+        this.state = SimState.SendingHello;
+    },
+
+    endHello() {
+        this.state = SimState.Selected;
+    },
+};
+
+export const nodeRenderer = {
+    previewDom: null,
+    selectedDom: null,
+
+    spawnPreview() {
         const node = document.createElement("div");
         node.classList.add("node", "preview");
         document.body.appendChild(node);
-        this.pendingNode = node;
-
-        return true;
+        this.previewDom = node;
     },
 
-    movePending(clientX, clientY) {
-        if (!this.pendingNode) {
-            return false;
-        }
-
-        this.pendingNode.style.left = `${clientX}px`;
-        this.pendingNode.style.top = `${clientY}px`;
-
-        return true;
+    movePreview(clientX, clientY) {
+        this.previewDom.style.left = `${clientX}px`;
+        this.previewDom.style.top = `${clientY}px`;
     },
 
-    placePending() {
-        if (!this.pendingNode) {
-            return false;
-        }
-
-        const node = this.pendingNode;
+    placePreview() {
+        const node = this.previewDom;
         node.classList.remove("preview");
-        node.dataset.id = this.nodes.length;
-        this.nodes.push(node);
 
+        node.dataset.id = nodeStore.nodes.length;
         this.pendingNode = null;
-        return true;
     },
 
-    cancelPending() {
-        if (!this.pendingNode) {
-            return false;
-        }
-
-        this.pendingNode.remove();
-        this.pendingNode = null;
-
-        return true;
+    removePreview() {
+        this.previewDom.remove();
+        this.previewDom = null;
     },
 
     selectNode(node, id, connections) {
-        if (this.selectedNode) {
-            this.selectedNode.classList.remove("selected");
+        if (this.selectedDom) {
+            this.selectedDom.classList.remove("selected");
         }
-
-        node.classList.add("selected");
 
         const info = document.getElementById("info-display");
         let html = `<div class="inner-text">ID: ${id}</div>`;
@@ -74,24 +95,32 @@ export const nodeManager = {
 
         html += '<button id="send" class="btn btn-primary">Send Hello</button>';
 
-        this.selectedNode = node;
+        node.classList.add("selected");
+        this.selectedDom = node;
         info.innerHTML = html;
     },
 
     deselectNode() {
-        if (!this.selectedNode) {
-            return false;
+        if (this.selectedDom) {
+            this.selectedDom.classList.remove("selected");
         }
 
-        this.selectedNode.classList.remove("selected");
-        this.selectedNode = null;
+        this.selectedDom = null;
 
         const instruction = document.getElementById("select-node");
         instruction.classList.remove("show");
 
         const info = document.getElementById("info-display");
         info.innerHTML = '<span class="placeholder-text">No node selected</span>';
+    },
 
-        return true;
+    startHello() {
+        const instruction = document.getElementById("select-node");
+        instruction.classList.add("show");
+    },
+
+    endHello() {
+        const instruction = document.getElementById("select-node");
+        instruction.classList.remove("show");
     },
 };

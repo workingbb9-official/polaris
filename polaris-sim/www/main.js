@@ -1,5 +1,6 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
-import { SimState, nodeStore, nodeRenderer } from "./nodeManager.js";
+import { SimState, nodeStore } from "./nodeStore.js";
+import { nodeRenderer } from "./nodeRenderer.js"
 
 let sim = null;
 
@@ -74,7 +75,7 @@ function handleKeyDown(e) {
 function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
         nodeStore.createNode();
-        nodeRenderer.placePreview();
+        nodeRenderer.placePreview(nodeStore.nodes.length);
         sim.spawn_node();
     } else {
         nodeStore.deselectNode();

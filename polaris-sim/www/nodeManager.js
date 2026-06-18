@@ -1,9 +1,7 @@
-export class NodeManager {
-    constructor() {
-        this.selectedNode = null;
-        this.pendingNode = null;
-        this.nodes = [];
-    }
+export const nodeManager = {
+    selectedNode: null,
+    pendingNode: null,
+    nodes: [],
 
     spawnPending() {
         if (this.pendingNode) {
@@ -16,7 +14,7 @@ export class NodeManager {
         this.pendingNode = node;
 
         return true;
-    }
+    },
 
     movePending(clientX, clientY) {
         if (!this.pendingNode) {
@@ -27,7 +25,7 @@ export class NodeManager {
         this.pendingNode.style.top = `${clientY}px`;
 
         return true;
-    }
+    },
 
     placePending() {
         if (!this.pendingNode) {
@@ -41,7 +39,7 @@ export class NodeManager {
 
         this.pendingNode = null;
         return true;
-    }
+    },
 
     cancelPending() {
         if (!this.pendingNode) {
@@ -52,7 +50,7 @@ export class NodeManager {
         this.pendingNode = null;
 
         return true;
-    }
+    },
 
     selectNode(node, id, connections) {
         if (this.selectedNode) {
@@ -78,7 +76,7 @@ export class NodeManager {
 
         this.selectedNode = node;
         info.innerHTML = html;
-    }
+    },
 
     deselectNode() {
         if (!this.selectedNode) {
@@ -95,5 +93,5 @@ export class NodeManager {
         info.innerHTML = '<span class="placeholder-text">No node selected</span>';
 
         return true;
-    }
-}
+    },
+};

@@ -91,12 +91,7 @@ pub(crate) struct Simulation {
 impl Simulation {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let nodes: Vec<SimNode> = Vec::new();
-        let mut sim = Self { nodes };
-
-        sim.spawn_node();
-        sim.spawn_node();
-        sim
+        Self { nodes: Vec::new() }
     }
 
     pub fn frame(&self) -> String {
@@ -163,6 +158,9 @@ mod tests {
     #[test]
     fn test_node_hello() {
         let mut sim = Simulation::new();
+        sim.spawn_node();
+        sim.spawn_node();
+
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
 
         assert!(matches!(
@@ -174,8 +172,10 @@ mod tests {
     #[test]
     fn test_node_tick() {
         let mut sim = Simulation::new();
-        sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
+        sim.spawn_node();
+        sim.spawn_node();
 
+        sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
         sim.tick(10);
 
         // Ensure welcome packet was sent back to node 0
@@ -185,21 +185,17 @@ mod tests {
     #[test]
     fn test_node_uptime() {
         let mut sim = Simulation::new();
+        sim.spawn_node();
 
-        for node in &sim.nodes {
-            assert_eq!(node.uptime, 0);
-        }
+        assert_eq!(sim.nodes[0].uptime, 0);
 
         sim.tick(10);
-
-        for node in &sim.nodes {
-            assert_eq!(node.uptime, 10);
-        }
+        assert_eq!(sim.nodes[0].uptime, 10);
 
         sim.spawn_node();
-        assert_eq!(sim.nodes[2].uptime, 0);
+        assert_eq!(sim.nodes[1].uptime, 0);
 
         sim.tick(10);
-        assert_eq!(sim.nodes[2].uptime, 10);
+        assert_eq!(sim.nodes[1].uptime, 10);
     }
 }

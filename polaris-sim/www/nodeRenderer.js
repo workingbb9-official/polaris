@@ -27,7 +27,7 @@ export const nodeRenderer = {
         this.previewDom = null;
     },
 
-    selectNode(node, id, uptime, connections) {
+    selectNode(node, id, uptime, peers) {
         if (this.selectedDom) {
             this.selectedDom.classList.remove("selected");
         }
@@ -36,13 +36,13 @@ export const nodeRenderer = {
         let html = `<div class="inner-text">ID: ${id}</div>`;
         html += `<div class="inner-text">Uptime: ${uptime}</div>`;
 
-        if (connections.length === 0) {
+        if (peers.length === 0) {
             html += '<div class="inner-text">Peers: None</div>';
-        } else if (connections.length === 1) {
-            const peer = connections[0];
+        } else if (peers.length === 1) {
+            const peer = peers[0];
             html += `<div class="inner-text">Peer: Node ${peer}</div>`;
         } else {
-            const peers = connections.join(", ");
+            const peers = peers.join(", ");
             html += `<div class="inner-text">Peers: Nodes ${peers}</div>`;
         }
 

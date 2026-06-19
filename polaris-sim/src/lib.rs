@@ -199,4 +199,20 @@ mod tests {
         sim.tick(10);
         assert_eq!(sim.nodes[1].uptime, 10);
     }
+
+    #[test]
+    fn test_peer_list() {
+        let mut sim = Simulation::new();
+        sim.spawn_node();
+
+        assert_eq!(sim.nodes[0].peers, Vec::new());
+
+        sim.spawn_node();
+        sim.send_hello(sim.nodes[1].id.0 as u32, sim.nodes[0].id.0 as u32);
+        assert_eq!(sim.nodes[0].peers[0], sim.nodes[1].id);
+
+        // Timeout occurs before heartbeat can be sent
+        sim.tick(400);
+        assert_eq!(sim.nodes[0].peers, Vec::new());
+    }
 }

@@ -23,8 +23,9 @@ struct SimNode {
 impl serde::Serialize for SimNode {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = s.serialize_struct("SimNode", 2)?;
+        let mut state = s.serialize_struct("SimNode", 3)?;
         state.serialize_field("id", &self.id.0)?;
+        state.serialize_field("uptime", &self.uptime)?;
         state.serialize_field(
             "connections",
             &self.connections.iter().map(|c| c.0).collect::<Vec<_>>(),

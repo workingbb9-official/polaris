@@ -39,7 +39,7 @@ function handleTickClick() {
     if (nodeStore.state === SimState.Selected) {
         const json = sim.node_info(nodeStore.selectedNodeId);
         const data = JSON.parse(json);
-        nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.connections);
+        nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.connections);
     }
 }
 
@@ -96,7 +96,7 @@ function handleDocumentClick(e) {
             const json = sim.node_info(node.dataset.id);
             const data = JSON.parse(json);
             nodeStore.selectNode(data.id);
-            nodeRenderer.selectNode(node, data.id, data.connections);
+            nodeRenderer.selectNode(node, data.id, data.uptime, data.connections);
             break;
         case SimState.SendingHello:
             sim.send_hello(nodeStore.selectedNodeId, node.dataset.id);

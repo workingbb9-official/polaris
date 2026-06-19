@@ -27,13 +27,14 @@ export const nodeRenderer = {
         this.previewDom = null;
     },
 
-    selectNode(node, id, connections) {
+    selectNode(node, id, uptime, connections) {
         if (this.selectedDom) {
             this.selectedDom.classList.remove("selected");
         }
 
         const info = document.getElementById("info-display");
         let html = `<div class="inner-text">ID: ${id}</div>`;
+        html += `<div class="inner-text">Uptime: ${uptime}</div>`;
 
         if (connections.length === 0) {
             html += '<div class="inner-text">Peers: None</div>';

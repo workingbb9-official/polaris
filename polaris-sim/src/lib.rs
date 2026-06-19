@@ -46,13 +46,6 @@ impl SimNode {
         }
     }
 
-    fn frame(&self) -> NodeFrame {
-        NodeFrame {
-            id: self.id.0,
-            connections: self.connections.iter().map(|id| id.0).collect(),
-        }
-    }
-
     fn receive(&mut self, buf: &[u8], id: NodeId) {
         let (event, action) = match self.inner.process_msg(buf, id, self.uptime) {
             Ok((e, a)) => (e, a),
@@ -86,12 +79,6 @@ impl SimNode {
     fn pop_action(&mut self) -> Option<NodeAction> {
         self.actions.pop()
     }
-}
-
-#[derive(serde::Serialize)]
-struct NodeFrame {
-    id: usize,
-    connections: Vec<usize>,
 }
 
 #[wasm_bindgen]

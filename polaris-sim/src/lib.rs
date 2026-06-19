@@ -17,7 +17,7 @@ struct SimNode {
     uptime: u32,
     events: heapless::Vec<NodeEvent, 8>,
     actions: heapless::Vec<NodeAction, 8>,
-    connections: Vec<NodeId>,
+    peers: Vec<NodeId>,
 }
 
 impl serde::Serialize for SimNode {
@@ -26,10 +26,7 @@ impl serde::Serialize for SimNode {
         let mut state = s.serialize_struct("SimNode", 3)?;
         state.serialize_field("id", &self.id.0)?;
         state.serialize_field("uptime", &self.uptime)?;
-        state.serialize_field(
-            "connections",
-            &self.connections.iter().map(|c| c.0).collect::<Vec<_>>(),
-        )?;
+        state.serialize_field("peers", &self.peers.iter().map(|c| c.0).collect::<Vec<_>>())?;
         state.end()
     }
 }
@@ -43,7 +40,7 @@ impl SimNode {
             uptime: 0,
             events: heapless::Vec::new(),
             actions: heapless::Vec::new(),
-            connections: Vec::new(),
+            peers: Vec::new(),
         }
     }
 
@@ -55,7 +52,7 @@ impl SimNode {
 
         if let Some(e) = event {
             if let NodeEvent::PeerDiscovered { .. } = e {
-                self.connections.push(id);
+                self.peers.push(id);
             }
 
             println!("Event on {}: {:?}", self.id.0, e);
@@ -179,7 +176,7 @@ mod tests {
         sim.tick(10);
 
         // Ensure welcome packet was sent back to node 0
-        assert_eq!(sim.nodes[0].connections[0], sim.nodes[1].id);
+        assert_eq!(sim.nodes[0].peers[0], sim.nodes[1].id);
     }
 
     #[test]

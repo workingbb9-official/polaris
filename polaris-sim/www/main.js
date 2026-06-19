@@ -74,8 +74,8 @@ function handleKeyDown(e) {
 
 function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
-        nodeStore.createNode();
         nodeRenderer.placePreview(nodeStore.nodes.length);
+        nodeStore.createNode();
         sim.spawn_node();
     } else {
         nodeStore.deselectNode();

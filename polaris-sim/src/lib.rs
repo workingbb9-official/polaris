@@ -69,6 +69,10 @@ impl SimNode {
             .tick(self.uptime, &mut self.events, &mut self.actions);
 
         while let Some(e) = self.events.pop() {
+            if let NodeEvent::PeerTimedOut(dev) = e {
+                self.peers.retain(|id| id.0 as u16 != dev.id().value());
+            }
+
             println!("Event on {}: {:?}", self.id.0, e);
         }
     }
@@ -100,7 +104,7 @@ impl Simulation {
     }
 
     pub fn spawn_node(&mut self) {
-        let node = SimNode::new(self.nodes.len() as u16, 1000);
+        let node = SimNode::new(self.nodes.len() as u16, 100);
         self.nodes.push(node);
     }
 

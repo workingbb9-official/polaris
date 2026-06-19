@@ -5,6 +5,7 @@
 
 use polaris::{Device, DeviceId, DeviceType};
 use polaris::{Node, NodeAction, NodeEvent};
+
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +54,10 @@ impl SimNode {
     }
 
     fn receive(&mut self, buf: &[u8], id: NodeId) {
-        let (event, action) = self.inner.process_msg(buf, id, self.uptime).unwrap();
+        let (event, action) = match self.inner.process_msg(buf, id, self.uptime) {
+            Ok((e, a)) => (e, a),
+            Err(_) => return,
+        };
 
         if let Some(e) = event {
             if let NodeEvent::PeerDiscovered { .. } = e {

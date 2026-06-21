@@ -1,5 +1,6 @@
 export const SimState = {
     Default: "default",
+    Configuring: "configuring",
     Spawning: "spawning",
     Selected: "selected",
     SendingHello: "sending hello",
@@ -11,8 +12,12 @@ export const nodeStore = {
     selectedNodeId: null,
     nodes: [],
 
-    startSpawning() {
+    startConfiguring() {
+        this.state = SimState.Configuring;
         this.previewNodeId = this.nodes.length;
+    },
+
+    startSpawning() {
         this.state = SimState.Spawning;
     },
 

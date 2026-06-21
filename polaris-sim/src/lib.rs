@@ -104,8 +104,8 @@ impl Simulation {
         serde_json::to_string(&self.nodes[id as usize]).unwrap()
     }
 
-    pub fn spawn_node(&mut self) {
-        let node = SimNode::new(self.nodes.len() as u16, 100);
+    pub fn spawn_node(&mut self, heartbeat: u32) {
+        let node = SimNode::new(self.nodes.len() as u16, heartbeat);
         self.nodes.push(node);
     }
 
@@ -167,8 +167,8 @@ mod tests {
     #[test]
     fn test_node_hello() {
         let mut sim = Simulation::new();
-        sim.spawn_node();
-        sim.spawn_node();
+        sim.spawn_node(100);
+        sim.spawn_node(100);
 
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
 
@@ -181,8 +181,8 @@ mod tests {
     #[test]
     fn test_node_tick() {
         let mut sim = Simulation::new();
-        sim.spawn_node();
-        sim.spawn_node();
+        sim.spawn_node(100);
+        sim.spawn_node(100);
 
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
         sim.tick(10);
@@ -194,14 +194,14 @@ mod tests {
     #[test]
     fn test_node_uptime() {
         let mut sim = Simulation::new();
-        sim.spawn_node();
+        sim.spawn_node(100);
 
         assert_eq!(sim.nodes[0].uptime, 0);
 
         sim.tick(10);
         assert_eq!(sim.nodes[0].uptime, 10);
 
-        sim.spawn_node();
+        sim.spawn_node(100);
         assert_eq!(sim.nodes[1].uptime, 0);
 
         sim.tick(10);
@@ -211,11 +211,11 @@ mod tests {
     #[test]
     fn test_peer_list() {
         let mut sim = Simulation::new();
-        sim.spawn_node();
+        sim.spawn_node(100);
 
         assert_eq!(sim.nodes[0].peers, Vec::new());
 
-        sim.spawn_node();
+        sim.spawn_node(100);
         sim.send_hello(sim.nodes[1].id.0 as u32, sim.nodes[0].id.0 as u32);
         assert_eq!(sim.nodes[0].peers[0], sim.nodes[1].id);
 

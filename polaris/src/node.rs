@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 workingbb9-official
 
-use crate::device::{DEVICE_ID_LEN, Device, DeviceId};
+use crate::device::{Device, DeviceId};
 use crate::peer::{Peer, PeerInfo};
 use crate::protocol::{
-    DataMessage, HeartbeatMessage, HelloMessage, MessageType, Packet, WelcomeMessage,
+    DATA_HEADER_LEN, DataHeader, HeartbeatMessage, HelloMessage, MessageType, Packet,
+    WelcomeMessage,
 };
 use crate::registry::{PeerRegistry, RegistryError};
 
@@ -48,8 +49,10 @@ pub enum NodeError {
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' object, or the message type was invalid for a node to receive.
     InvalidMessage,
-    /// The payload exceeded maximum size of 255.
+    /// The data payload exceeded maximum size of 255.
     PayloadTooLarge,
+    /// The destination buffer for the data packet was too small.
+    BufferTooSmall,
     /// Error propagated from the registry.
     Registry(RegistryError),
 }
@@ -117,23 +120,29 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             .expect("HelloPacket should be 9 bytes")
     }
 
-    pub fn create_data(&self, payload: &[u8]) -> Result<[u8; 259], NodeError> {
+    pub fn create_data(&self, payload: &[u8], dst: &mut [u8]) -> Result<usize, NodeError> {
         if payload.len() > 255 {
             return Err(NodeError::PayloadTooLarge);
         }
 
-        let mut msg = DataMessage {
+        let header_len = DATA_HEADER_LEN;
+        let total_len = header_len + payload.len();
+
+        if dst.len() < total_len {
+            return Err(NodeError::BufferTooSmall);
+        }
+
+        let header = DataHeader {
             from: self.dev.id(),
             len: payload.len() as u8,
-            payload: [0; 255],
         };
 
-        msg.payload[..payload.len()].copy_from_slice(payload);
+        let packet = Packet::new(MessageType::Data, header);
 
-        Ok(Packet::new(MessageType::Data, msg)
-            .as_bytes()
-            .try_into()
-            .expect("Data packet should be 259 bytes"))
+        dst[..header_len].copy_from_slice(packet.as_bytes());
+        dst[header_len..total_len].copy_from_slice(payload);
+
+        Ok(total_len)
     }
 
     /// Collect passive events and actions to take.
@@ -233,9 +242,21 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
                 }
             }
             MessageType::Data => {
-                if let Ok(packet) = Packet::<DataMessage>::ref_from_bytes(raw) {
-                    let data = &packet.payload;
-                    self.process_data(data, addr, now).map(|a| (Some(a), None))
+                let header_len = DATA_HEADER_LEN;
+
+                if raw.len() < header_len {
+                    return Err(NodeError::InvalidMessage);
+                }
+
+                if let Ok(packet) = Packet::<DataHeader>::ref_from_bytes(&raw[..header_len]) {
+                    let expected = header_len + packet.payload.len as usize;
+
+                    if raw.len() < expected {
+                        return Err(NodeError::InvalidMessage);
+                    }
+
+                    self.process_data(&packet.payload, addr, now)
+                        .map(|a| (Some(a), None))
                 } else {
                     Err(NodeError::InvalidMessage)
                 }
@@ -304,7 +325,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
 
     fn process_data(
         &mut self,
-        msg: &DataMessage,
+        msg: &DataHeader,
         addr: Addr,
         now: u32,
     ) -> Result<NodeEvent, NodeError> {
@@ -312,7 +333,7 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
         let heartbeat = HeartbeatMessage { from: msg.from };
         self.process_heartbeat(&heartbeat, addr, now)?;
 
-        let start = DEVICE_ID_LEN + 1;
+        let start = DATA_HEADER_LEN;
         let end = start + msg.len as usize;
 
         Ok(NodeEvent::DataReceived {

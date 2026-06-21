@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+use polaris::DATA_HEADER_LEN;
 use polaris::{Device, DeviceId, DeviceType};
 use polaris::{Node, NodeAction, NodeEvent};
 
@@ -143,8 +144,15 @@ impl Simulation {
     }
 
     pub fn send_data(&mut self, buf: &[u8], from: u32, to: u32) {
-        let data = self.nodes[from as usize].inner.create_data(buf).unwrap();
-        self.nodes[to as usize].receive(&data, NodeId(from as usize));
+        let mut packet = Vec::new();
+        let len = DATA_HEADER_LEN + buf.len();
+
+        self.nodes[from as usize]
+            .inner
+            .create_data(buf, &mut packet[..len])
+            .unwrap();
+
+        self.nodes[to as usize].receive(&packet, NodeId(from as usize));
     }
 }
 

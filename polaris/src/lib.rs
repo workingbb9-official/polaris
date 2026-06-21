@@ -10,4 +10,5 @@ mod registry;
 pub use device::{Device, DeviceId, DeviceType};
 pub use node::{Node, NodeAction, NodeError, NodeEvent};
 pub use peer::PeerInfo;
+pub use protocol::DATA_HEADER_LEN;
 pub use registry::RegistryError;

@@ -6,6 +6,8 @@
 use crate::device::{Device, DeviceId};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+pub const DATA_HEADER_LEN: usize = core::mem::size_of::<Packet<DataHeader>>();
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum MessageType {
@@ -61,10 +63,9 @@ pub(crate) struct WelcomeMessage {
 
 #[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
-pub(crate) struct DataMessage {
+pub(crate) struct DataHeader {
     pub from: DeviceId,
     pub len: u8,
-    pub payload: [u8; 255],
 }
 
 #[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]

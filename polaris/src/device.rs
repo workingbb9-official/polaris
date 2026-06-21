@@ -3,8 +3,6 @@
 
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-pub(crate) const DEVICE_ID_LEN: usize = 2;
-
 /// Metadata for all devices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Device {

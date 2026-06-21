@@ -48,6 +48,8 @@ pub enum NodeError {
     /// The message received was invalid. This could be returned if the bytes could not be parsed
     /// into a 'Message' object, or the message type was invalid for a node to receive.
     InvalidMessage,
+    /// The payload exceeded maximum size of 255.
+    PayloadTooLarge,
     /// Error propagated from the registry.
     Registry(RegistryError),
 }
@@ -115,8 +117,11 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
             .expect("HelloPacket should be 9 bytes")
     }
 
-    pub fn create_data(&self, payload: &[u8]) -> [u8; 259] {
-        assert!(payload.len() <= 255);
+    pub fn create_data(&self, payload: &[u8]) -> Result<[u8; 259], NodeError> {
+        if payload.len() > 255 {
+            return Err(NodeError::PayloadTooLarge);
+        }
+
         let mut msg = DataMessage {
             from: self.dev.id(),
             len: payload.len() as u8,
@@ -125,10 +130,10 @@ impl<Addr: core::fmt::Debug, const MAX_PEERS: usize> Node<Addr, MAX_PEERS> {
 
         msg.payload[..payload.len()].copy_from_slice(payload);
 
-        Packet::new(MessageType::Data, msg)
+        Ok(Packet::new(MessageType::Data, msg)
             .as_bytes()
             .try_into()
-            .expect("Data packet should be 259 bytes")
+            .expect("Data packet should be 259 bytes"))
     }
 
     /// Collect passive events and actions to take.

@@ -143,7 +143,7 @@ impl Simulation {
     }
 
     pub fn send_data(&mut self, buf: &[u8], from: u32, to: u32) {
-        let data = self.nodes[from as usize].inner.create_data(buf);
+        let data = self.nodes[from as usize].inner.create_data(buf).unwrap();
         self.nodes[to as usize].receive(&data, NodeId(from as usize));
     }
 }

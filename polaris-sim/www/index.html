@@ -19,6 +19,19 @@
                     <span class="placeholder-text">No node selected</span>
                 </div>
             </div>
+
+            <div id="config-section" class="sidebar-section unified-panel hidden">
+                <h2>Node Config</h2>
+                <div class="input-group">
+                    <label for="node-heartbeat-input">Heartbeat (ms)</label>
+                    <input type="number" id="node-heartbeat-input" value="1000">
+                </div>
+
+                <div class="button-row">
+                    <button id="cancel-config-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-config-btn" class="btn btn-primary">Start Placing</button>
+                </div>
+            </div>
         </div>
 
         <canvas id="canvas"></canvas>

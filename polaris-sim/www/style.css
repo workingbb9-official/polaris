@@ -202,3 +202,48 @@ canvas {
 .hidden-instruction.show {
     display: block;
 }
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.input-group label {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.input-group input,
+.input-group select {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    color: #f8fafc;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.hidden {
+    display: none !important;
+}

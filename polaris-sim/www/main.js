@@ -27,6 +27,12 @@ function initEventListeners() {
 
     const info = document.getElementById("info-display");
     info.addEventListener("click", handleInfoClick);
+
+    const confirmConfig = document.getElementById("confirm-config-btn");
+    confirmConfig.addEventListener("click", handleConfirmConfig);
+
+    const cancelConfig = document.getElementById("cancel-config-btn");
+    cancelConfig.addEventListener("click", handleCancelConfig);
 }
 
 function handleTickClick() {
@@ -51,10 +57,37 @@ function handleSpawnClick() {
     }
 
     if (nodeStore.state === SimState.Default) {
-        nodeStore.startSpawning();
-        nodeRenderer.spawnPreview();
+        nodeStore.startConfiguring();
+        nodeRenderer.showConfigPage();
     }
 
+}
+
+function handleConfirmConfig() {
+    if (nodeStore.state !== SimState.Configuring) {
+        return;
+    }
+
+    const raw = document.getElementById("node-heartbeat-input").value;
+    const heartbeat = parseInt(raw, 10);
+
+    if (isNaN(heartbeat) || heartbeat < 0) {
+        document.getElementById("node-heartbeat-input").value = 1000;
+        return;
+    }
+
+    nodeStore.startSpawning(heartbeat);
+    nodeRenderer.spawnPreview();
+    nodeRenderer.hideConfigPage();
+}
+
+function handleCancelConfig() {
+    if (nodeStore.state !== SimState.Configuring) {
+        return;
+    }
+
+    nodeStore.cancelConfiguring();
+    nodeRenderer.hideConfigPage();
 }
 
 function handleMouseMove(e) {
@@ -75,8 +108,8 @@ function handleKeyDown(e) {
 function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
         nodeRenderer.placePreview(nodeStore.nodes.length);
+        sim.spawn_node(nodeStore.currentConfig.heartbeat);
         nodeStore.createNode();
-        sim.spawn_node();
     } else {
         nodeStore.deselectNode();
         nodeRenderer.deselectNode();

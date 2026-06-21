@@ -11,13 +11,23 @@ export const nodeStore = {
     previewNodeId: null,
     selectedNodeId: null,
     nodes: [],
+    currentConfig: {
+        heartbeat: null,
+    },
 
     startConfiguring() {
+        this.currentConfig.heartbeat = null;
         this.state = SimState.Configuring;
         this.previewNodeId = this.nodes.length;
     },
 
-    startSpawning() {
+    cancelConfiguring() {
+        this.previewNodeId = null;
+        this.state = SimState.Default;
+    }
+
+    startSpawning(heartbeat) {
+        this.currentConfig.heartbeat = heartbeat;
         this.state = SimState.Spawning;
     },
 

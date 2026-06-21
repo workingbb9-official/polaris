@@ -2,6 +2,22 @@ export const nodeRenderer = {
     previewDom: null,
     selectedDom: null,
 
+    showConfigPage() {
+        const info = document.getElementById("info-section");
+        info.classList.add("hidden");
+
+        const config = document.getElementById("config-section");
+        config.classList.remove("hidden");
+    },
+
+    hideConfigPage() {
+        const config = document.getElementById("config-section");
+        config.classList.add("hidden");
+
+        const info = document.getElementById("info-section");
+        info.classList.remove("hidden");
+    },
+
     spawnPreview() {
         const node = document.createElement("div");
         node.classList.add("node", "preview");

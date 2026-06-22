@@ -109,7 +109,7 @@ function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
         nodeRenderer.placePreview(nodeStore.nodes.length);
         sim.spawn_node(nodeStore.currentConfig.heartbeat);
-        nodeStore.createNode();
+        nodeStore.createNode(e.clientX, e.clientY);
     } else {
         nodeStore.deselectNode();
         nodeRenderer.deselectNode();

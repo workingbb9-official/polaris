@@ -47,6 +47,8 @@ function handleTickClick() {
         const data = JSON.parse(json);
         nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.peers);
     }
+
+    drawConnections();
 }
 
 function handleSpawnClick() {
@@ -145,8 +147,6 @@ function handleDocumentClick(e) {
             sim.send_hello(nodeStore.selectedNodeId, targetNodeId);
             nodeStore.endHello();
             nodeRenderer.endHello();
-
-            connectNodes(nodeStore.selectedNodeId, targetNodeId);
             break;
         case SimState.Spawning:
             break;
@@ -157,6 +157,32 @@ function handleInfoClick(e) {
     if (nodeStore.state === SimState.Selected && e.target.id === "send") {
         nodeStore.startHello();
         nodeRenderer.startHello();
+    }
+}
+
+function drawConnections() {
+    nodeRenderer.clearCanvas();
+
+    const drawnConnections = new Set();
+
+    for (const node of nodeStore.nodes) {
+        const json = sim.node_info(node.id);
+        const data = JSON.parse(json);
+
+        for (const peerId of data.peers) {
+            const pairKey = [node.id, peerId].sort().join("-");
+            if (drawnConnections.has(pairKey)) {
+                continue;
+            }
+
+            const peerJson = sim.node_info(peerId);
+            const peerData = JSON.parse(peerJson);
+
+            if (peerData.peers.includes(node.id)) {
+                connectNodes(node.id, peerId);
+                drawnConnections.add(pairKey);
+            }
+        }
     }
 }
 

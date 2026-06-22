@@ -24,7 +24,7 @@ export const nodeStore = {
     cancelConfiguring() {
         this.previewNodeId = null;
         this.state = SimState.Default;
-    }
+    },
 
     startSpawning(heartbeat) {
         this.currentConfig.heartbeat = heartbeat;

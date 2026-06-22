@@ -107,9 +107,11 @@ export const nodeRenderer = {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
+        // Draw relative to canvas and not window
+        const rect = canvas.getBoundingClientRect();
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.moveTo(x1 - rect.left, y1 - rect.top);
+        ctx.lineTo(x2 - rect.left, y2 - rect.top);
 
         ctx.strokeStyle = "#2ecc71";
         ctx.lineWidth = 4;

@@ -92,4 +92,22 @@ export const nodeRenderer = {
         const instruction = document.getElementById("select-node");
         instruction.classList.remove("show");
     },
+
+    drawLineBetween(x1, y1, x2, y2) {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+
+        ctx.strokeStyle = "#2ecc71";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+
+        ctx.stroke();
+    },
 };

@@ -109,7 +109,12 @@ function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
         nodeRenderer.placePreview(nodeStore.nodes.length);
         sim.spawn_node(nodeStore.currentConfig.heartbeat);
-        nodeStore.createNode(e.clientX, e.clientY);
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+
+        nodeStore.createNode(canvasX, canvasY);
     } else {
         nodeStore.deselectNode();
         nodeRenderer.deselectNode();
@@ -126,15 +131,23 @@ function handleDocumentClick(e) {
         case SimState.Default:
             // fallthrough
         case SimState.Selected:
-            const json = sim.node_info(node.dataset.id);
+            const nodeId = parseInt(node.dataset.id, 10);
+
+            const json = sim.node_info(nodeId);
             const data = JSON.parse(json);
+
             nodeStore.selectNode(data.id);
             nodeRenderer.selectNode(node, data.id, data.uptime, data.peers);
             break;
         case SimState.SendingHello:
-            sim.send_hello(nodeStore.selectedNodeId, node.dataset.id);
+            const targetNodeId = parseInt(node.dataset.id, 10);
+
+            sim.send_hello(nodeStore.selectedNodeId, targetNodeId);
             nodeStore.endHello();
             nodeRenderer.endHello();
+
+            connectNodes(nodeStore.selectedNodeId, targetNodeId);
+            break;
         case SimState.Spawning:
             break;
     }
@@ -145,6 +158,17 @@ function handleInfoClick(e) {
         nodeStore.startHello();
         nodeRenderer.startHello();
     }
+}
+
+function connectNodes(node1, node2) {
+    const firstNode = nodeStore.getNodeFromId(node1);
+    const secondNode = nodeStore.getNodeFromId(node2);
+
+    if (!firstNode || !secondNode) {
+        return;
+    }
+
+    nodeRenderer.drawLineBetween(firstNode.x, firstNode.y, secondNode.x, secondNode.y);
 }
 
 run();

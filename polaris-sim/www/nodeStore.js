@@ -64,4 +64,8 @@ export const nodeStore = {
     endHello() {
         this.state = SimState.Selected;
     },
+
+    getNodeFromId(id) {
+        return this.nodes.find(node => node.id === id);
+    },
 };

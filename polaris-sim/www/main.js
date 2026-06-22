@@ -143,6 +143,11 @@ function handleDocumentClick(e) {
             sim.send_hello(nodeStore.selectedNodeId, targetNodeId);
             nodeStore.endHello();
             nodeRenderer.endHello();
+
+            const from = nodeStore.getNodeFromId(nodeStore.selectedNodeId);
+            const to = nodeStore.getNodeFromId(targetNodeId);
+
+            nodeRenderer.sendPacket(from.x, from.y, to.x, to.y);
             break;
         case SimState.Spawning:
             break;

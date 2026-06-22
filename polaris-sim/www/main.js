@@ -112,11 +112,7 @@ function handleCanvasClick(e) {
         nodeRenderer.placePreview(nodeStore.nodes.length);
         sim.spawn_node(nodeStore.currentConfig.heartbeat);
 
-        const rect = e.currentTarget.getBoundingClientRect();
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
-
-        nodeStore.createNode(canvasX, canvasY);
+        nodeStore.createNode(e.clientX, e.clientY);
     } else {
         nodeStore.deselectNode();
         nodeRenderer.deselectNode();

@@ -58,7 +58,7 @@ export const nodeRenderer = {
             const peer = peers[0];
             html += `<div class="inner-text">Peer: Node ${peer}</div>`;
         } else {
-            const peers = peers.join(", ");
+            const peer_list = peers.join(", ");
             html += `<div class="inner-text">Peers: Nodes ${peers}</div>`;
         }
 
@@ -93,12 +93,19 @@ export const nodeRenderer = {
         instruction.classList.remove("show");
     },
 
-    drawLineBetween(x1, y1, x2, y2) {
+    clearCanvas() {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    },
+
+    drawLineBetween(x1, y1, x2, y2) {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
 
         ctx.beginPath();
         ctx.moveTo(x1, y1);

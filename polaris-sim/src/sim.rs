@@ -25,8 +25,22 @@ impl Simulation {
         serde_json::to_string(&self.nodes[id as usize]).unwrap()
     }
 
-    pub fn spawn_node(&mut self, heartbeat: u32) {
-        let node = SimNode::new(self.nodes.len() as u16, heartbeat);
+    pub fn node_position(&self, id: u32) -> Result<Vec<u32>, JsValue> {
+        if self.nodes.len() as u32 <= id {
+            return Err(JsValue::from_str("Index out of bounds"));
+        }
+
+        let (x, y) = self.nodes[id as usize].position();
+        Ok(vec![x, y])
+    }
+
+    pub fn total_nodes(&self) -> u32 {
+        self.nodes.len() as u32
+    }
+
+    // Node IDs are auto incremented starting from 0
+    pub fn spawn_node(&mut self, x: u32, y: u32, heartbeat: u32) {
+        let node = SimNode::new(self.nodes.len() as u16, x, y, heartbeat);
         self.nodes.push(node);
     }
 
@@ -84,8 +98,8 @@ mod tests {
     #[test]
     fn test_node_hello() {
         let mut sim = Simulation::new();
-        sim.spawn_node(100);
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
+        sim.spawn_node(0, 0, 100);
 
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
 
@@ -98,8 +112,8 @@ mod tests {
     #[test]
     fn test_node_tick() {
         let mut sim = Simulation::new();
-        sim.spawn_node(100);
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
+        sim.spawn_node(0, 0, 100);
 
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
         sim.tick(10);
@@ -111,14 +125,14 @@ mod tests {
     #[test]
     fn test_node_uptime() {
         let mut sim = Simulation::new();
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
 
         assert_eq!(sim.nodes[0].uptime, 0);
 
         sim.tick(10);
         assert_eq!(sim.nodes[0].uptime, 10);
 
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
         assert_eq!(sim.nodes[1].uptime, 0);
 
         sim.tick(10);
@@ -128,11 +142,11 @@ mod tests {
     #[test]
     fn test_peer_list() {
         let mut sim = Simulation::new();
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
 
         assert_eq!(sim.nodes[0].peers, Vec::new());
 
-        sim.spawn_node(100);
+        sim.spawn_node(0, 0, 100);
         sim.send_hello(sim.nodes[1].id.0 as u32, sim.nodes[0].id.0 as u32);
         assert_eq!(sim.nodes[0].peers[0], sim.nodes[1].id);
 

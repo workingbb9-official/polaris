@@ -8,9 +8,7 @@ export const SimState = {
 
 export const nodeStore = {
     state: SimState.Default,
-    previewNodeId: null,
     selectedNodeId: null,
-    nodes: [],
     currentConfig: {
         heartbeat: null,
     },
@@ -18,11 +16,9 @@ export const nodeStore = {
     startConfiguring() {
         this.currentConfig.heartbeat = null;
         this.state = SimState.Configuring;
-        this.previewNodeId = this.nodes.length;
     },
 
     cancelConfiguring() {
-        this.previewNodeId = null;
         this.state = SimState.Default;
     },
 
@@ -32,13 +28,10 @@ export const nodeStore = {
     },
 
     createNode() {
-        this.nodes.push(this.previewNodeId);
-        this.previewNodeId = null;
         this.state = SimState.Default;
     },
 
     cancelSpawning() {
-        this.previewNodeId = null;
         this.state = SimState.Default;
     },
 
@@ -58,9 +51,5 @@ export const nodeStore = {
 
     endHello() {
         this.state = SimState.Selected;
-    },
-
-    getNodeFromId(id) {
-        return this.nodes.find(node => node.id === id);
     },
 };

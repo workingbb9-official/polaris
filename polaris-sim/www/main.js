@@ -109,9 +109,9 @@ function handleKeyDown(e) {
 
 function handleCanvasClick(e) {
     if (nodeStore.state === SimState.Spawning) {
-        nodeRenderer.placePreview(nodeStore.nodes.length);
-        sim.spawn_node(nodeStore.currentConfig.heartbeat);
-        nodeStore.createNode(e.clientX, e.clientY);
+        nodeRenderer.placePreview(sim.total_nodes());
+        sim.spawn_node(e.clientX, e.clientY, nodeStore.currentConfig.heartbeat);
+        nodeStore.createNode();
     } else {
         nodeStore.deselectNode();
         nodeRenderer.deselectNode();
@@ -143,10 +143,10 @@ function handleDocumentClick(e) {
             nodeStore.endHello();
             nodeRenderer.endHello();
 
-            const from = nodeStore.getNodeFromId(nodeStore.selectedNodeId);
-            const to = nodeStore.getNodeFromId(targetNodeId);
+            const [x1, y1] = sim.node_position(nodeStore.selectedNodeId);
+            const [x2, y2] = sim.node_position(targetNodeId);
 
-            nodeRenderer.sendPacket(from.x, from.y, to.x, to.y);
+            nodeRenderer.sendPacket(x1, y1, x2, y2);
             break;
         case SimState.Spawning:
             break;
@@ -165,12 +165,12 @@ function drawConnections() {
 
     const drawnConnections = new Set();
 
-    for (const node of nodeStore.nodes) {
-        const json = sim.node_info(node.id);
+    for (let nodeId = 0; nodeId < sim.total_nodes(); ++nodeId) {
+        const json = sim.node_info(nodeId);
         const data = JSON.parse(json);
 
         for (const peerId of data.peers) {
-            const pairKey = [node.id, peerId].sort().join("-");
+            const pairKey = [nodeId, peerId].sort().join("-");
             if (drawnConnections.has(pairKey)) {
                 continue;
             }
@@ -178,8 +178,8 @@ function drawConnections() {
             const peerJson = sim.node_info(peerId);
             const peerData = JSON.parse(peerJson);
 
-            if (peerData.peers.includes(node.id)) {
-                connectNodes(node.id, peerId);
+            if (peerData.peers.includes(nodeId)) {
+                connectNodes(nodeId, peerId);
                 drawnConnections.add(pairKey);
             }
         }
@@ -187,14 +187,15 @@ function drawConnections() {
 }
 
 function connectNodes(node1, node2) {
-    const firstNode = nodeStore.getNodeFromId(node1);
-    const secondNode = nodeStore.getNodeFromId(node2);
+    try {
+        const [x1, y1] = sim.node_position(node1);
+        const [x2, y2] = sim.node_position(node2);
 
-    if (!firstNode || !secondNode) {
-        return;
+        nodeRenderer.drawLineBetween(x1, y1, x2, y2);
+    } catch (error) {
+        console.error("Failed to get position:", error);
     }
 
-    nodeRenderer.drawLineBetween(firstNode.x, firstNode.y, secondNode.x, secondNode.y);
 }
 
 run();

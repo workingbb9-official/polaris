@@ -15,6 +15,8 @@ pub struct SimNode {
     pub peers: Vec<NodeId>,
     events: heapless::Vec<NodeEvent, 8>,
     actions: heapless::Vec<NodeAction, 8>,
+    x: u32,
+    y: u32,
 }
 
 impl serde::Serialize for SimNode {
@@ -29,7 +31,7 @@ impl serde::Serialize for SimNode {
 }
 
 impl SimNode {
-    pub fn new(id: u16, interval: u32) -> Self {
+    pub fn new(id: u16, x: u32, y: u32, interval: u32) -> Self {
         let node = Node::new(dev(id), interval);
         Self {
             inner: node,
@@ -38,7 +40,13 @@ impl SimNode {
             events: heapless::Vec::new(),
             actions: heapless::Vec::new(),
             peers: Vec::new(),
+            x,
+            y,
         }
+    }
+
+    pub fn position(&self) -> (u32, u32) {
+        (self.x, self.y)
     }
 
     pub fn receive(&mut self, buf: &[u8], id: NodeId) {

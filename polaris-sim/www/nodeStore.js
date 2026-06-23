@@ -31,13 +31,8 @@ export const nodeStore = {
         this.state = SimState.Spawning;
     },
 
-    createNode(x, y) {
-        this.nodes.push({
-            id: this.previewNodeId,
-            x: x,
-            y: y,
-        });
-
+    createNode() {
+        this.nodes.push(this.previewNodeId);
         this.previewNodeId = null;
         this.state = SimState.Default;
     },

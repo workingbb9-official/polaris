@@ -40,7 +40,7 @@ function handleTickClick() {
         return;
     }
 
-    sim.tick(10);
+    const events = JSON.parse(sim.tick(10));
 
     if (uiState.mode === Mode.Selected) {
         const json = sim.node_info(uiState.selectedNodeId);
@@ -48,6 +48,7 @@ function handleTickClick() {
         nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.peers);
     }
 
+    handleSimEvents(events)
     drawConnections();
 }
 
@@ -196,6 +197,18 @@ function connectNodes(node1, node2) {
         console.error("Failed to get position:", error);
     }
 
+}
+
+function handleSimEvents(events) {
+    for (const event of events) {
+        switch (event.type) {
+            case "PacketSent":
+                nodeRenderer.sendPacket(event.from_x, event.from_y, event.to_x, event.to_y)
+                break;
+            case "PeerConnected":
+                break;
+        }
+    }
 }
 
 run();

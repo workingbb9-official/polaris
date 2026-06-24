@@ -14,7 +14,7 @@ pub struct Simulation {
 #[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum SimEvent {
-    PacketSent {
+    WelcomePacketSent {
         from_x: u32,
         from_y: u32,
         to_x: u32,
@@ -85,7 +85,7 @@ impl Simulation {
                 let (from_x, from_y) = self.nodes[from.0].position();
                 let (to_x, to_y) = self.nodes[to as usize].position();
 
-                SimEvent::PacketSent {
+                SimEvent::WelcomePacketSent {
                     from_x,
                     from_y,
                     to_x,
@@ -99,7 +99,8 @@ impl Simulation {
                 let (from_x, from_y) = self.nodes[from.0].position();
                 let (to_x, to_y) = self.nodes[to as usize].position();
 
-                SimEvent::PacketSent {
+                // TODO: make heartbeat packet enum variant
+                SimEvent::WelcomePacketSent {
                     from_x,
                     from_y,
                     to_x,

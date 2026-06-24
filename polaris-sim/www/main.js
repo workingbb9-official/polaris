@@ -201,7 +201,7 @@ function connectNodes(node1, node2) {
 function handleSimEvents(events) {
     for (const event of events) {
         switch (event.type) {
-            case "PacketSent":
+            case "WelcomePacketSent":
                 nodeRenderer.sendPacket(event.from_x, event.from_y, event.to_x, event.to_y, drawConnections)
                 break;
             default:

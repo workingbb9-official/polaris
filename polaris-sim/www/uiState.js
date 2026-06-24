@@ -1,4 +1,4 @@
-export const SimState = {
+export const Mode = {
     Default: "default",
     Configuring: "configuring",
     Spawning: "spawning",
@@ -6,8 +6,8 @@ export const SimState = {
     SendingHello: "sending hello",
 };
 
-export const nodeStore = {
-    state: SimState.Default,
+export const uiState = {
+    mode: Mode.Default,
     selectedNodeId: null,
     currentConfig: {
         heartbeat: null,
@@ -15,41 +15,41 @@ export const nodeStore = {
 
     startConfiguring() {
         this.currentConfig.heartbeat = null;
-        this.state = SimState.Configuring;
+        this.mode = Mode.Configuring;
     },
 
     cancelConfiguring() {
-        this.state = SimState.Default;
+        this.mode = Mode.Default;
     },
 
     startSpawning(heartbeat) {
         this.currentConfig.heartbeat = heartbeat;
-        this.state = SimState.Spawning;
+        this.mode = Mode.Spawning;
     },
 
     createNode() {
-        this.state = SimState.Default;
+        this.mode = Mode.Default;
     },
 
     cancelSpawning() {
-        this.state = SimState.Default;
+        this.mode = Mode.Default;
     },
 
     selectNode(id) {
         this.selectedNodeId = id;
-        this.state = SimState.Selected;
+        this.mode = Mode.Selected;
     },
 
     deselectNode() {
         this.selectedNodeId = null;
-        this.state = SimState.Default;
+        this.mode = Mode.Default;
     },
 
     startHello() {
-        this.state = SimState.SendingHello;
+        this.mode = Mode.SendingHello;
     },
 
     endHello() {
-        this.state = SimState.Selected;
+        this.mode = Mode.Selected;
     },
 };

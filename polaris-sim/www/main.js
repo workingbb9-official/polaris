@@ -1,5 +1,5 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
-import { SimState, nodeStore } from "./nodeStore.js";
+import { Mode, uiState } from "./uiState.js";
 import { nodeRenderer } from "./nodeRenderer.js"
 
 let sim = null;
@@ -36,14 +36,14 @@ function initEventListeners() {
 }
 
 function handleTickClick() {
-    if (nodeStore.state === SimState.Spawning || nodeStore.state === SimState.SendingHello) {
+    if (uiState.mode === Mode.Spawning || uiState.mode === Mode.SendingHello) {
         return;
     }
 
     sim.tick(10);
 
-    if (nodeStore.state === SimState.Selected) {
-        const json = sim.node_info(nodeStore.selectedNodeId);
+    if (uiState.mode === Mode.Selected) {
+        const json = sim.node_info(uiState.selectedNodeId);
         const data = JSON.parse(json);
         nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.peers);
     }
@@ -52,21 +52,21 @@ function handleTickClick() {
 }
 
 function handleSpawnClick() {
-    if (nodeStore.state === SimState.Selected) {
-        nodeStore.deselectNode();
+    if (uiState.mode === Mode.Selected) {
+        uiState.deselectNode();
         nodeRenderer.deselectNode();
 
     }
 
-    if (nodeStore.state === SimState.Default) {
-        nodeStore.startConfiguring();
+    if (uiState.mode === Mode.Default) {
+        uiState.startConfiguring();
         nodeRenderer.showConfigPage();
     }
 
 }
 
 function handleConfirmConfig() {
-    if (nodeStore.state !== SimState.Configuring) {
+    if (uiState.mode !== Mode.Configuring) {
         return;
     }
 
@@ -78,42 +78,42 @@ function handleConfirmConfig() {
         return;
     }
 
-    nodeStore.startSpawning(heartbeat);
+    uiState.startSpawning(heartbeat);
     nodeRenderer.spawnPreview();
     nodeRenderer.hideConfigPage();
 }
 
 function handleCancelConfig() {
-    if (nodeStore.state !== SimState.Configuring) {
+    if (uiState.mode !== Mode.Configuring) {
         return;
     }
 
-    nodeStore.cancelConfiguring();
+    uiState.cancelConfiguring();
     nodeRenderer.hideConfigPage();
 }
 
 function handleMouseMove(e) {
-    if (nodeStore.state === SimState.Spawning) {
+    if (uiState.mode === Mode.Spawning) {
         nodeRenderer.movePreview(e.clientX, e.clientY);
     }
 }
 
 function handleKeyDown(e) {
     if (e.key === "Escape") {
-        if (nodeStore.state === SimState.Spawning) {
-            nodeStore.cancelSpawning();
+        if (uiState.mode === Mode.Spawning) {
+            uiState.cancelSpawning();
             nodeRenderer.removePreview();
         }
     }
 }
 
 function handleCanvasClick(e) {
-    if (nodeStore.state === SimState.Spawning) {
+    if (uiState.mode === Mode.Spawning) {
         nodeRenderer.placePreview(sim.total_nodes());
-        sim.spawn_node(e.clientX, e.clientY, nodeStore.currentConfig.heartbeat);
-        nodeStore.createNode();
+        sim.spawn_node(e.clientX, e.clientY, uiState.currentConfig.heartbeat);
+        uiState.createNode();
     } else {
-        nodeStore.deselectNode();
+        uiState.deselectNode();
         nodeRenderer.deselectNode();
     }
 }
@@ -124,38 +124,38 @@ function handleDocumentClick(e) {
         return;
     }
 
-    switch (nodeStore.state) {
-        case SimState.Default:
+    switch (uiState.mode ) {
+        case Mode.Default:
             // fallthrough
-        case SimState.Selected:
+        case Mode.Selected:
             const nodeId = parseInt(node.dataset.id, 10);
 
             const json = sim.node_info(nodeId);
             const data = JSON.parse(json);
 
-            nodeStore.selectNode(data.id);
+            uiState.selectNode(data.id);
             nodeRenderer.selectNode(node, data.id, data.uptime, data.peers);
             break;
-        case SimState.SendingHello:
+        case Mode.SendingHello:
             const targetNodeId = parseInt(node.dataset.id, 10);
 
-            sim.send_hello(nodeStore.selectedNodeId, targetNodeId);
-            nodeStore.endHello();
+            sim.send_hello(uiState.selectedNodeId, targetNodeId);
+            uiState.endHello();
             nodeRenderer.endHello();
 
-            const [x1, y1] = sim.node_position(nodeStore.selectedNodeId);
+            const [x1, y1] = sim.node_position(uiState.selectedNodeId);
             const [x2, y2] = sim.node_position(targetNodeId);
 
             nodeRenderer.sendPacket(x1, y1, x2, y2);
             break;
-        case SimState.Spawning:
+        case Mode.Spawning:
             break;
     }
 }
 
 function handleInfoClick(e) {
-    if (nodeStore.state === SimState.Selected && e.target.id === "send") {
-        nodeStore.startHello();
+    if (uiState.mode === Mode.Selected && e.target.id === "send") {
+        uiState.startHello();
         nodeRenderer.startHello();
     }
 }

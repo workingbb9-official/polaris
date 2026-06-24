@@ -3,11 +3,23 @@ use crate::sim_node::{NodeId, SimNode};
 use polaris::DATA_HEADER_LEN;
 use polaris::NodeAction;
 
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct Simulation {
     nodes: Vec<SimNode>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type")]
+pub enum SimEvent {
+    PacketSent {
+        from_x: u32,
+        from_y: u32,
+        to_x: u32,
+        to_y: u32,
+    },
 }
 
 #[wasm_bindgen]
@@ -44,7 +56,7 @@ impl Simulation {
         self.nodes.push(node);
     }
 
-    pub fn tick(&mut self, time: u32) {
+    pub fn tick(&mut self, time: u32) -> String {
         let mut actions = Vec::new();
 
         for node in &mut self.nodes {
@@ -55,20 +67,44 @@ impl Simulation {
             }
         }
 
+        let mut sim_events = Vec::new();
+
         for (from, action) in actions {
-            self.handle_action(from, action);
+            sim_events.push(self.handle_action(from, action));
         }
+
+        serde_json::to_string(&sim_events).unwrap()
     }
 
-    fn handle_action(&mut self, from: NodeId, action: NodeAction) {
+    fn handle_action(&mut self, from: NodeId, action: NodeAction) -> SimEvent {
         match action {
             NodeAction::SendWelcome { dev, msg } => {
                 let to = dev.id().value();
                 self.nodes[to as usize].receive(&msg, from);
+
+                let (from_x, from_y) = self.nodes[from.0].position();
+                let (to_x, to_y) = self.nodes[to as usize].position();
+
+                SimEvent::PacketSent {
+                    from_x,
+                    from_y,
+                    to_x,
+                    to_y,
+                }
             }
             NodeAction::SendHeartbeat { dev, msg } => {
                 let to = dev.id().value();
                 self.nodes[to as usize].receive(&msg, from);
+
+                let (from_x, from_y) = self.nodes[from.0].position();
+                let (to_x, to_y) = self.nodes[to as usize].position();
+
+                SimEvent::PacketSent {
+                    from_x,
+                    from_y,
+                    to_x,
+                    to_y,
+                }
             }
         }
     }

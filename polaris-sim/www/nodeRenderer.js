@@ -93,17 +93,14 @@ export const nodeRenderer = {
         instruction.classList.remove("show");
     },
 
-    clearCanvas() {
+    resizeCanvas() {
         const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
     },
 
     drawLineBetween(x1, y1, x2, y2) {
+
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
@@ -144,7 +141,9 @@ export const nodeRenderer = {
 
         packet.addEventListener("transitionend", () => {
             packet.remove();
-            if (onArrive) onArrive();
+            if (onArrive) {
+                onArrive();
+            }
         }, { once: true });
     }
 

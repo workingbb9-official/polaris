@@ -7,6 +7,7 @@ let sim = null;
 async function run() {
     await init();
     sim = new Simulation();
+    nodeRenderer.resizeCanvas();
     initEventListeners();
 }
 
@@ -160,49 +161,22 @@ function handleInfoClick(e) {
     }
 }
 
-function drawConnections() {
-    nodeRenderer.clearCanvas();
-
-    const drawnConnections = new Set();
-
-    for (let nodeId = 0; nodeId < sim.total_nodes(); ++nodeId) {
-        const json = sim.node_info(nodeId);
-        const data = JSON.parse(json);
-
-        for (const peerId of data.peers) {
-            const pairKey = [nodeId, peerId].sort().join("-");
-            if (drawnConnections.has(pairKey)) {
-                continue;
-            }
-
-            const peerJson = sim.node_info(peerId);
-            const peerData = JSON.parse(peerJson);
-
-            if (peerData.peers.includes(nodeId)) {
-                connectNodes(nodeId, peerId);
-                drawnConnections.add(pairKey);
-            }
-        }
-    }
-}
-
-function connectNodes(node1, node2) {
-    try {
-        const [x1, y1] = sim.node_position(node1);
-        const [x2, y2] = sim.node_position(node2);
-
-        nodeRenderer.drawLineBetween(x1, y1, x2, y2);
-    } catch (error) {
-        console.error("Failed to get position:", error);
-    }
-
-}
-
 function handleSimEvents(events) {
     for (const event of events) {
         switch (event.type) {
             case "WelcomePacketSent":
-                nodeRenderer.sendPacket(event.from_x, event.from_y, event.to_x, event.to_y, drawConnections)
+                nodeRenderer.sendPacket(
+                    event.from_x,
+                    event.from_y,
+                    event.to_x,
+                    event.to_y,
+                    () => nodeRenderer.drawLineBetween(
+                        event.from_x,
+                        event.from_y,
+                        event.to_x,
+                        event.to_y,
+                    ),
+                );
                 break;
             default:
                 break;

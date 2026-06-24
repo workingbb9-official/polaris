@@ -120,7 +120,7 @@ export const nodeRenderer = {
         ctx.stroke();
     },
 
-    sendPacket(x1, y1, x2, y2) {
+    sendPacket(x1, y1, x2, y2, onArrive) {
         const packet = packetImg.cloneNode();
 
         packet.style.cssText = `
@@ -142,7 +142,10 @@ export const nodeRenderer = {
             });
         });
 
-        packet.addEventListener("transitionend", () => packet.remove(), { once: true });
+        packet.addEventListener("transitionend", () => {
+            packet.remove();
+            if (onArrive) onArrive();
+        }, { once: true });
     }
 
 };

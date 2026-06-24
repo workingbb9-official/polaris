@@ -49,7 +49,6 @@ function handleTickClick() {
     }
 
     handleSimEvents(events)
-    drawConnections();
 }
 
 function handleSpawnClick() {
@@ -203,9 +202,9 @@ function handleSimEvents(events) {
     for (const event of events) {
         switch (event.type) {
             case "PacketSent":
-                nodeRenderer.sendPacket(event.from_x, event.from_y, event.to_x, event.to_y)
+                nodeRenderer.sendPacket(event.from_x, event.from_y, event.to_x, event.to_y, drawConnections)
                 break;
-            case "PeerConnected":
+            default:
                 break;
         }
     }

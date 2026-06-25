@@ -20,6 +20,12 @@ pub enum SimEvent {
         to_x: u32,
         to_y: u32,
     },
+    HeartbeatPacketSent {
+        from_x: u32,
+        from_y: u32,
+        to_x: u32,
+        to_y: u32,
+    },
 }
 
 #[wasm_bindgen]
@@ -99,8 +105,7 @@ impl Simulation {
                 let (from_x, from_y) = self.nodes[from.0].position();
                 let (to_x, to_y) = self.nodes[to as usize].position();
 
-                // TODO: make heartbeat packet enum variant
-                SimEvent::WelcomePacketSent {
+                SimEvent::HeartbeatPacketSent {
                     from_x,
                     from_y,
                     to_x,

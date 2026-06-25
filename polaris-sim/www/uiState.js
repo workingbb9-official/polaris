@@ -7,6 +7,7 @@ export const Mode = {
 };
 
 export const uiState = {
+    uptime: 0,
     mode: Mode.Default,
     selectedNodeId: null,
     currentConfig: {
@@ -51,5 +52,9 @@ export const uiState = {
 
     endHello() {
         this.mode = Mode.Selected;
+    },
+
+    increaseUptime(elapsed) {
+        this.uptime += elapsed;
     },
 };

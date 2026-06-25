@@ -50,6 +50,8 @@ function handleTickClick() {
     }
 
     handleSimEvents(events)
+    uiState.increaseUptime(10);
+    nodeRenderer.displayUptime(uiState.uptime);
 }
 
 function handleSpawnClick() {

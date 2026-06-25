@@ -145,8 +145,12 @@ export const nodeRenderer = {
                 onArrive();
             }
         }, { once: true });
-    }
+    },
 
+    displayUptime(uptime) {
+        const box = document.getElementById("time-box");
+        box.textContent = uptime;
+    },
 };
 
 const packetSVG = `

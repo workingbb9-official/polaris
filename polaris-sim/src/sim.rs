@@ -133,6 +133,13 @@ impl Simulation {
             .unwrap();
 
         self.nodes[to as usize].receive(&packet, NodeId(from as usize));
+
+        let id = self.nodes[to as usize].inner.dev().id();
+        let uptime = self.nodes[from as usize].uptime;
+        self.nodes[from as usize]
+            .inner
+            .msg_sent(id, uptime)
+            .unwrap();
     }
 }
 

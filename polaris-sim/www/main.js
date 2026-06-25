@@ -178,6 +178,14 @@ function handleSimEvents(events) {
                     ),
                 );
                 break;
+            case "HeartbeatPacketSent":
+                nodeRenderer.sendPacket(
+                    event.from_x,
+                    event.from_y,
+                    event.to_x,
+                    event.to_y,
+                );
+                break;
             default:
                 break;
         }

@@ -105,6 +105,9 @@ impl Simulation {
                 let (from_x, from_y) = self.nodes[from.0].position();
                 let (to_x, to_y) = self.nodes[to as usize].position();
 
+                let uptime = self.nodes[from.0].uptime;
+                self.nodes[from.0].inner.msg_sent(dev.id(), uptime).unwrap();
+
                 SimEvent::HeartbeatPacketSent {
                     from_x,
                     from_y,

@@ -59,7 +59,7 @@ export const nodeRenderer = {
             html += `<div class="inner-text">Peer: Node ${peer}</div>`;
         } else {
             const peer_list = peers.join(", ");
-            html += `<div class="inner-text">Peers: Nodes ${peers}</div>`;
+            html += `<div class="inner-text">Peers: Nodes ${peer_list}</div>`;
         }
 
         html += '<button id="send" class="btn btn-primary">Send Hello</button>';

@@ -3,6 +3,7 @@ import { Mode, uiState } from "./uiState.js";
 import { nodeRenderer } from "./nodeRenderer.js"
 
 let sim = null;
+let timerId = null;
 
 async function run() {
     await init();
@@ -41,17 +42,25 @@ function handleTickClick() {
         return;
     }
 
-    const events = JSON.parse(sim.tick(10));
-
-    if (uiState.mode === Mode.Selected) {
-        const json = sim.node_info(uiState.selectedNodeId);
-        const data = JSON.parse(json);
-        nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.peers);
+    if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+        return;
     }
 
-    handleSimEvents(events)
-    uiState.increaseUptime(10);
-    nodeRenderer.displayUptime(uiState.uptime);
+    timerId = setInterval(() => {
+        const events = JSON.parse(sim.tick(10));
+
+        if (uiState.mode === Mode.Selected) {
+            const json = sim.node_info(uiState.selectedNodeId);
+            const data = JSON.parse(json);
+            nodeRenderer.selectNode(nodeRenderer.selectedDom, data.id, data.uptime, data.peers);
+        }
+
+        handleSimEvents(events)
+        uiState.increaseUptime(10);
+        nodeRenderer.displayUptime(uiState.uptime);
+    }, 1000);
 }
 
 function handleSpawnClick() {

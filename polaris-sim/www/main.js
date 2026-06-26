@@ -43,6 +43,7 @@ function handleTickClick() {
     }
 
     if (timerId !== null) {
+        nodeRenderer.stopTicking();
         clearInterval(timerId);
         timerId = null;
         return;
@@ -61,6 +62,8 @@ function handleTickClick() {
         uiState.increaseUptime(10);
         nodeRenderer.displayUptime(uiState.uptime);
     }, 1000);
+
+    nodeRenderer.startTicking();
 }
 
 function handleSpawnClick() {

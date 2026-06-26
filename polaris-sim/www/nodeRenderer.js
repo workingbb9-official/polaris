@@ -151,6 +151,16 @@ export const nodeRenderer = {
         const box = document.getElementById("time-box");
         box.textContent = uptime;
     },
+
+    startTicking() {
+        const tickButton = document.getElementById("tick");
+        tickButton.innerText = "Stop Ticking";
+    },
+
+    stopTicking() {
+        const tickButton = document.getElementById("tick");
+        tickButton.innerText = "Start Ticking";
+    }
 };
 
 const packetSVG = `

@@ -1,28 +1,12 @@
-export const scriptRunner {
-    runNodeScript(userCode, simulation) {
-        let output = [];
-
-        const sendPayload = function(payload) {
-            try {
-                simulation.send_data(payload);
-            } catch (e) {
-                output.push("API Error: Failed to send payload via Rust.");
-            }
-        };
-
-        const customConsole = {
-            log: (msg) => output.push(msg),
-            print: (msg) => output.push(msg)
-        };
-
+export const scriptRunner = {
+    runNodeScript(userCode) {
         try {
-            const runner = new Function("sendPayload", "print", "console", userCode);
-
-            runner(sendPayload, customConsole.print, customConsole);
-
-            return { success: true, logs: output };
+            const runner = new Function(userCode);
+            runner();
+            return true;
         } catch (error) {
-            return { success: false, logs: [error.message] };
+            console.error("User code crashed:", error.message);
+            return false;
         }
-    }
-}
+    },
+};

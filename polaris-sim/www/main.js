@@ -1,6 +1,7 @@
 import init, { Simulation } from "../pkg/polaris_sim.js";
 import { Mode, uiState } from "./uiState.js";
-import { nodeRenderer } from "./nodeRenderer.js"
+import { nodeRenderer } from "./nodeRenderer.js";
+import { scriptRunner } from "./scriptRunner.js";
 
 let sim = null;
 let timerId = null;
@@ -179,8 +180,9 @@ function handleInfoClick(e) {
     }
 
     if (e.target.id === "submit-script-btn") {
-        const text = document.getElementById("node-script-input").value;
+        const text = document.getElementById("node-script-input").value.trim();
         console.log(`Script submitted: ${text}`);
+        scriptRunner.runNodeScript(text);
     }
 }
 

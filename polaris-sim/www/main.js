@@ -169,9 +169,18 @@ function handleDocumentClick(e) {
 }
 
 function handleInfoClick(e) {
-    if (uiState.mode === Mode.Selected && e.target.id === "send") {
+    if (uiState.mode !== Mode.Selected) {
+        return;
+    }
+
+    if (e.target.id === "send") {
         uiState.startHello();
         nodeRenderer.startHello();
+    }
+
+    if (e.target.id === "submit-script-btn") {
+        const text = document.getElementById("node-script-input").value;
+        console.log(`Script submitted: ${text}`);
     }
 }
 

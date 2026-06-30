@@ -64,6 +64,16 @@ export const nodeRenderer = {
 
         html += '<button id="send" class="btn btn-primary">Send Hello</button>';
 
+        html += `
+            <div id="script-section">\
+                <h3 class="inner-text">Custom Script</h3>\
+                <textarea id="node-script-input" rows="5"></textarea>\
+                <button type="button" id="submit-script-btn" class="btn btn-primary">\
+                    Embed Script\
+                </button>\
+            </div>
+        `;
+
         node.classList.add("selected");
         this.selectedDom = node;
         info.innerHTML = html;

@@ -246,3 +246,31 @@ canvas {
 .hidden {
     display: none !important;
 }
+
+#script-section {
+    margin-top: 50px;
+    padding-top: 16px;
+}
+
+#node-script-input {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    color: #f8fafc;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    box-sizing: border-box;
+    width: 100%;
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.5;
+}
+
+#node-script-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}

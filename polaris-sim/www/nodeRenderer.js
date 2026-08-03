@@ -135,6 +135,10 @@ export const nodeRenderer = {
     redrawLines() {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
+        const rect = canvas.getBoundingClientRect();
+
+        canvas.width = rect.width;
+        canvas.height = rect.height;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 

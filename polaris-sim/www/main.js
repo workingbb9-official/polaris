@@ -5,6 +5,7 @@ import { scriptRunner } from "./scriptRunner.js";
 
 let sim = null;
 let timerId = null;
+let resizeTimer = null;
 
 async function run() {
     await init();
@@ -22,6 +23,7 @@ function initEventListeners() {
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleWindowResize)
 
     const canvas = document.getElementById("canvas");
     canvas.addEventListener("click", handleCanvasClick);
@@ -215,6 +217,11 @@ function handleSimEvents(events) {
                 break;
         }
     }
+}
+
+function handleWindowResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(nodeRenderer.redrawLines(), 100)
 }
 
 run();

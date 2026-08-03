@@ -1,6 +1,7 @@
 export const nodeRenderer = {
     previewDom: null,
     selectedDom: null,
+    lines: [],
 
     showConfigPage() {
         const info = document.getElementById("info-section");
@@ -109,8 +110,7 @@ export const nodeRenderer = {
         canvas.height = canvas.clientHeight;
     },
 
-    drawLineBetween(x1, y1, x2, y2) {
-
+    renderSingleLine(x1, y1, x2, y2) {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
@@ -125,6 +125,22 @@ export const nodeRenderer = {
         ctx.lineCap = "round";
 
         ctx.stroke();
+    },
+
+    drawLineBetween(x1, y1, x2, y2) {
+        this.lines.push({x1, y1, x2, y2})
+        this.renderSingleLine(x1, y1, x2, y2)
+    },
+
+    redrawLines() {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const line of this.lines) {
+            this.renderSingleLine(line.x1, line.y1, line.x2, line.y2);
+        }
     },
 
     sendPacket(x1, y1, x2, y2, onArrive) {

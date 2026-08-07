@@ -24,7 +24,7 @@ canvas {
 .sidebar {
     background-color: #0f172a;
     border-left: 1px solid #334155;
-    padding: 24px;
+    padding: clamp(10px, 1.5vw, 24px);
     display: flex;
     flex-direction: column;
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
@@ -98,8 +98,8 @@ canvas {
 
 .btn {
     border: none;
-    padding: 12px 20px;
-    font-size: 0.95rem;
+    padding: clamp(6px, 0.8vw, 12px) clamp(8px, 1vw, 20px);
+    font-size: clamp(0.75rem, 0.85vw, 0.95rem);
     font-weight: 600;
     cursor: pointer;
     border-radius: 8px;

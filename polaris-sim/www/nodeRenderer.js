@@ -36,7 +36,9 @@ export const nodeRenderer = {
         node.classList.remove("preview");
 
         node.dataset.id = id;
-        this.pendingNode = null;
+        this.storeNormalizedPosition(node)
+
+        this.previewDom = null;
     },
 
     removePreview() {
@@ -190,6 +192,33 @@ export const nodeRenderer = {
     stopTicking() {
         const tickButton = document.getElementById("tick");
         tickButton.innerText = "Start Ticking";
+    },
+
+    storeNormalizedPosition(node) {
+        const canvas = document.getElementById("canvas");
+        const rect = canvas.getBoundingClientRect();
+
+        const x = parseFloat(node.style.left);
+        const y = parseFloat(node.style.top);
+
+        node.dataset.nx = (x - rect.left) / rect.width;
+        node.dataset.ny = (y - rect.top) / rect.height;
+    },
+
+    repositionNodes() {
+        const canvas = document.getElementById("canvas");
+        const rect = canvas.getBoundingClientRect();
+        const nodes = document.querySelectorAll(".node:not(.preview)");
+
+        nodes.forEach((node) => {
+            const nx = parseFloat(node.dataset.nx);
+            const ny = parseFloat(node.dataset.ny);
+
+            if (!isNaN(nx) && !isNaN(ny)) {
+                node.style.left = `${rect.left + nx * rect.width}px`;
+                node.style.top = `${rect.top + ny * rect.height}px`;
+            }
+        });
     }
 };
 

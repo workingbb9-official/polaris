@@ -221,7 +221,10 @@ function handleSimEvents(events) {
 
 function handleWindowResize() {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(nodeRenderer.redrawLines(), 100)
+    resizeTimer = setTimeout(() => {
+        nodeRenderer.redrawLines();
+        nodeRenderer.repositionNodes();
+    }, 100);
 }
 
 run();

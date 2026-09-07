@@ -36,7 +36,7 @@ export const nodeRenderer = {
         node.classList.remove("preview");
 
         node.dataset.id = id;
-        this.storeNormalizedPosition(node)
+        this.storeNodePosition(node)
 
         this.previewDom = null;
     },
@@ -116,11 +116,9 @@ export const nodeRenderer = {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Draw relative to canvas and not window
-        const rect = canvas.getBoundingClientRect();
         ctx.beginPath();
-        ctx.moveTo(x1 - rect.left, y1 - rect.top);
-        ctx.lineTo(x2 - rect.left, y2 - rect.top);
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
 
         ctx.strokeStyle = "#2ecc71";
         ctx.lineWidth = 4;
@@ -130,22 +128,34 @@ export const nodeRenderer = {
     },
 
     drawLineBetween(x1, y1, x2, y2) {
-        this.lines.push({x1, y1, x2, y2})
-        this.renderSingleLine(x1, y1, x2, y2)
+        const canvas = document.getElementById("canvas");
+        const rect = canvas.getBoundingClientRect();
+
+        const lx1 = x1 - rect.left;
+        const ly1 = y1 - rect.top;
+        const lx2 = x2 - rect.left;
+        const ly2 = y2 - rect.top;
+
+        this.storeLinePosition(x1, y1, x2, y2);
+        this.renderSingleLine(lx1, ly1, lx2, ly2);
     },
 
     redrawLines() {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-        const rect = canvas.getBoundingClientRect();
 
-        canvas.width = rect.width;
-        canvas.height = rect.height;
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         for (const line of this.lines) {
-            this.renderSingleLine(line.x1, line.y1, line.x2, line.y2);
+            this.renderSingleLine(
+                line.nx1 * canvas.width,
+                line.ny1 * canvas.height,
+                line.nx2 * canvas.width,
+                line.ny2 * canvas.height
+            );
         }
     },
 
@@ -194,7 +204,7 @@ export const nodeRenderer = {
         tickButton.innerText = "Start Ticking";
     },
 
-    storeNormalizedPosition(node) {
+    storeNodePosition(node) {
         const canvas = document.getElementById("canvas");
         const rect = canvas.getBoundingClientRect();
 
@@ -203,6 +213,18 @@ export const nodeRenderer = {
 
         node.dataset.nx = (x - rect.left) / rect.width;
         node.dataset.ny = (y - rect.top) / rect.height;
+    },
+
+    storeLinePosition(x1, y1, x2, y2) {
+        const canvas = document.getElementById("canvas");
+        const rect = canvas.getBoundingClientRect();
+
+        const nx1 = (x1 - rect.left) / rect.width;
+        const ny1 = (y1 - rect.top) / rect.height;
+        const nx2 = (x2 - rect.left) / rect.width;
+        const ny2 = (y2 - rect.top) / rect.height;
+
+        this.lines.push({ nx1, ny1, nx2, ny2 });
     },
 
     repositionNodes() {

@@ -134,8 +134,15 @@ function handleKeyDown(e) {
 
 function handleCanvasClick(e) {
     if (uiState.mode === Mode.Spawning) {
-        nodeRenderer.placePreview(sim.total_nodes());
+        const newNodeId = sim.total_nodes();
+        nodeRenderer.placePreview(newNodeId);
         sim.spawn_node(e.clientX, e.clientY, uiState.currentConfig.heartbeat);
+
+        const userCode = uiState.currentConfig.script;
+        if (userCode) {
+            scriptRunner.setNodeScript(newNodeId, userCode);
+        }
+
         uiState.createNode();
     } else {
         uiState.deselectNode();

@@ -6,7 +6,7 @@ export const scriptRunner = {
     },
 
     getNodeScript(nodeId) {
-        return this.scripts.get(nodeId) || "";
+        return this.scripts.get(nodeId) || null;
     },
 
     runNodeScript(nodeId) {

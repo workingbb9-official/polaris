@@ -25,4 +25,10 @@ export const scriptRunner = {
             return false;
         }
     },
+
+    runScripts() {
+        for (const nodeId of this.scripts.keys()) {
+            this.runNodeScript(nodeId);
+        }
+    },
 };

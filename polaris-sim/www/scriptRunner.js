@@ -1,11 +1,27 @@
 export const scriptRunner = {
-    runNodeScript(userCode) {
+    scripts: new Map(),
+
+    setNodeScript(nodeId, userCode) {
+        this.scripts.set(nodeId, userCode);
+    },
+
+    getNodeScript(nodeId) {
+        return this.scripts.get(nodeId) || "";
+    },
+
+    runNodeScript(nodeId) {
+        const userCode = this.scripts.get(nodeId);
+        if (!userCode) {
+            console.log(`No script found for node ${nodeId}`);
+            return false;
+        }
+
         try {
             const runner = new Function(userCode);
             runner();
             return true;
         } catch (error) {
-            console.error("User code crashed:", error.message);
+            console.error(`User code crashed for node ${nodeId}:`, error.message);
             return false;
         }
     },

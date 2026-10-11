@@ -9,16 +9,24 @@ export const scriptRunner = {
         return this.scripts.get(nodeId) || null;
     },
 
-    runNodeScript(nodeId) {
+    runNodeScript(nodeId, nodeInfo) {
         const userCode = this.scripts.get(nodeId);
         if (!userCode) {
             console.log(`No script found for node ${nodeId}`);
             return false;
         }
 
+        const nodeAPI = {
+            info: Object.freeze({
+                id: nodeInfo.id,
+                uptime: nodeInfo.uptime,
+                peers: [...nodeInfo.peers]
+            }),
+        };
+
         try {
-            const runner = new Function(userCode);
-            runner();
+            const runner = new Function("node", userCode);
+            runner(nodeAPI);
             return true;
         } catch (error) {
             console.error(`User code crashed for node ${nodeId}:`, error.message);
@@ -26,9 +34,10 @@ export const scriptRunner = {
         }
     },
 
-    runScripts() {
+    runScripts(getNodeInfo) {
         for (const nodeId of this.scripts.keys()) {
-            this.runNodeScript(nodeId);
+            const nodeInfo = getNodeInfo(nodeId);
+            this.runNodeScript(nodeId, nodeInfo);
         }
     },
 };

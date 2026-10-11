@@ -64,6 +64,7 @@ function handleTickClick() {
         handleSimEvents(events)
         uiState.increaseUptime(10);
         nodeRenderer.displayUptime(uiState.uptime);
+        scriptRunner.runScripts();
     }, 1000);
 
     nodeRenderer.startTicking();

@@ -12,10 +12,12 @@ export const uiState = {
     selectedNodeId: null,
     currentConfig: {
         heartbeat: null,
+        script: null,
     },
 
     startConfiguring() {
         this.currentConfig.heartbeat = null;
+        this.currentConfig.script = null; 
         this.mode = Mode.Configuring;
     },
 
@@ -23,8 +25,9 @@ export const uiState = {
         this.mode = Mode.Default;
     },
 
-    startSpawning(heartbeat) {
+    startSpawning(heartbeat, script) {
         this.currentConfig.heartbeat = heartbeat;
+        this.currentConfig.script = script;
         this.mode = Mode.Spawning;
     },
 

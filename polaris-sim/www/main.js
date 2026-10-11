@@ -97,11 +97,13 @@ function handleConfirmConfig() {
     }
 
     const scriptText = document.getElementById("node-script-input").value.trim();
-    if (scriptText) {
-        console.log(`Configured with script: ${scriptText}`);
+    if (scriptText === "") {
+        uiState.startSpawning(heartbeat, null);
+    } else {
+        console.log(`Node script: ${scriptText}`);
+        uiState.startSpawning(heartbeat, scriptText);
     }
 
-    uiState.startSpawning(heartbeat);
     nodeRenderer.spawnPreview();
     nodeRenderer.hideConfigPage();
 }

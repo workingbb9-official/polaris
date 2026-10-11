@@ -96,6 +96,11 @@ function handleConfirmConfig() {
         return;
     }
 
+    const scriptText = document.getElementById("node-script-input").value.trim();
+    if (scriptText) {
+        console.log(`Configured with script: ${scriptText}`);
+    }
+
     uiState.startSpawning(heartbeat);
     nodeRenderer.spawnPreview();
     nodeRenderer.hideConfigPage();
@@ -179,12 +184,6 @@ function handleInfoClick(e) {
     if (e.target.id === "send") {
         uiState.startHello();
         nodeRenderer.startHello();
-    }
-
-    if (e.target.id === "submit-script-btn") {
-        const text = document.getElementById("node-script-input").value.trim();
-        console.log(`Script submitted: ${text}`);
-        scriptRunner.runNodeScript(text);
     }
 }
 

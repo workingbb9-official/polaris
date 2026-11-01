@@ -1,8 +1,10 @@
 export const scriptRunner = {
     scripts: new Map(),
+    nodeStates: new Map(),
 
     setNodeScript(nodeId, userCode) {
         this.scripts.set(nodeId, userCode);
+        this.nodeStates.set(nodeId, {});
     },
 
     getNodeScript(nodeId) {
@@ -16,12 +18,16 @@ export const scriptRunner = {
             return false;
         }
 
+        const state = this.nodeStates.get(nodeId);
+
         const nodeAPI = {
             info: Object.freeze({
                 id: nodeInfo.id,
                 uptime: nodeInfo.uptime,
                 peers: [...nodeInfo.peers]
             }),
+
+            state: state,
         };
 
         try {

@@ -9,77 +9,85 @@ fn dev(id: u16) -> Device {
 }
 
 pub struct SimNode {
-    pub inner: polaris::Node<NodeId, 20>,
+    pub inner: Node<NodeId, 20>,
     pub id: NodeId,
     pub uptime: u32,
-    pub peers: Vec<NodeId>,
+
     events: heapless::Vec<NodeEvent, 8>,
     actions: heapless::Vec<NodeAction, 8>,
-    x: u32,
-    y: u32,
+
+    position: (u32, u32),
 }
 
 impl serde::Serialize for SimNode {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = s.serialize_struct("SimNode", 3)?;
+
+        let mut state = serializer.serialize_struct("SimNode", 3)?;
+
         state.serialize_field("id", &self.id.0)?;
         state.serialize_field("uptime", &self.uptime)?;
-        state.serialize_field("peers", &self.peers.iter().map(|c| c.0).collect::<Vec<_>>())?;
+
+        let peers: Vec<u32> = self.peers().into_iter().map(|id| id.0 as u32).collect();
+        state.serialize_field("peers", &peers)?;
         state.end()
     }
 }
 
 impl SimNode {
     pub fn new(id: u16, x: u32, y: u32, interval: u32) -> Self {
-        let node = Node::new(dev(id), interval);
         Self {
-            inner: node,
+            inner: Node::new(dev(id), interval),
             id: NodeId(id as usize),
             uptime: 0,
             events: heapless::Vec::new(),
             actions: heapless::Vec::new(),
-            peers: Vec::new(),
-            x,
-            y,
+            position: (x, y),
         }
     }
 
+    /// Returns X and Y position of node
     pub fn position(&self) -> (u32, u32) {
-        (self.x, self.y)
+        self.position
     }
 
-    pub fn receive(&mut self, buf: &[u8], id: NodeId) {
-        let (event, action) = match self.inner.process_msg(buf, id, self.uptime) {
-            Ok((e, a)) => (e, a),
-            Err(_) => return,
+    /// Returns peers as [`NodeId`]
+    pub fn peers(&self) -> Vec<NodeId> {
+        let peers: Vec<NodeId> = self
+            .inner
+            .peers()
+            .map(|peer| NodeId(peer.dev.id().value() as usize))
+            .collect();
+        peers
+    }
+
+    /// Processes message and stores outputted events and actions to take.
+    pub fn receive(&mut self, buf: &[u8], from: NodeId) {
+        let Ok((event, action)) = self.inner.process_msg(buf, from, self.uptime) else {
+            return;
         };
 
-        if let Some(e) = event {
-            if let NodeEvent::PeerDiscovered { .. } = e {
-                self.peers.push(id);
-            }
-
-            println!("Event on {}: {:?}", self.id.0, e);
+        if let Some(event) = event {
+            self.events.push(event).expect("Event buffer full");
         }
 
-        if let Some(a) = action {
-            self.actions.push(a).expect("Buffer should be flushed");
+        if let Some(action) = action {
+            self.actions.push(action).expect("Action buffer full");
         }
     }
 
+    /// Updates node uptime and ticks time forward, collecting events and actions to take.
     pub fn update(&mut self, elapsed: u32) {
         self.uptime += elapsed;
+
         self.inner
             .tick(self.uptime, &mut self.events, &mut self.actions);
+    }
 
-        while let Some(e) = self.events.pop() {
-            if let NodeEvent::PeerTimedOut(dev) = e {
-                self.peers.retain(|id| id.0 as u16 != dev.id().value());
-            }
-
-            println!("Event on {}: {:?}", self.id.0, e);
-        }
+    #[allow(dead_code)]
+    #[inline]
+    pub fn pop_event(&mut self) -> Option<NodeEvent> {
+        self.events.pop()
     }
 
     #[inline]

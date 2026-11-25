@@ -30,6 +30,10 @@ pub enum SimEvent {
         node: u32,
         peer: u32,
     },
+    PeerTimedOut {
+        node: u32,
+        peer: u32,
+    },
 }
 
 #[wasm_bindgen]
@@ -143,7 +147,15 @@ impl Simulation {
                     peer,
                 })
             }
-            _ => None,
+            NodeEvent::PeerTimedOut(dev) => {
+                let peer = dev.id().value() as u32;
+
+                Some(SimEvent::PeerTimedOut {
+                    node: from.0 as u32,
+                    peer,
+                })
+            }
+            NodeEvent::DataReceived { .. } => None,
         }
     }
 

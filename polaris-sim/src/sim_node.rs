@@ -17,6 +17,8 @@ pub struct SimNode {
     actions: heapless::Vec<NodeAction, 8>,
 
     position: (u32, u32),
+
+    data_queue: Vec<Vec<u8>>,
 }
 
 impl serde::Serialize for SimNode {
@@ -43,6 +45,7 @@ impl SimNode {
             events: heapless::Vec::new(),
             actions: heapless::Vec::new(),
             position: (x, y),
+            data_queue: Vec::new(),
         }
     }
 
@@ -68,6 +71,11 @@ impl SimNode {
         };
 
         if let Some(event) = event {
+            if let NodeEvent::DataReceived { ref range, .. } = event {
+                let data = buf[range.clone()].to_vec();
+                self.data_queue.push(data);
+            }
+
             self.events.push(event).expect("Event buffer full");
         }
 
@@ -93,5 +101,10 @@ impl SimNode {
     #[inline]
     pub fn pop_action(&mut self) -> Option<NodeAction> {
         self.actions.pop()
+    }
+
+    #[inline]
+    pub fn pop_data(&mut self) -> Option<Vec<u8>> {
+        self.data_queue.pop()
     }
 }

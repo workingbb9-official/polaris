@@ -1,7 +1,7 @@
 use crate::sim_node::{NodeId, SimNode};
 
 use polaris::DATA_HEADER_LEN;
-use polaris::NodeAction;
+use polaris::{NodeAction, NodeEvent};
 
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -25,6 +25,10 @@ pub enum SimEvent {
         from_y: u32,
         to_x: u32,
         to_y: u32,
+    },
+    PeerDiscovered {
+        node: u32,
+        peer: u32,
     },
 }
 
@@ -64,12 +68,17 @@ impl Simulation {
 
     pub fn tick(&mut self, time: u32) -> String {
         let mut actions = Vec::new();
+        let mut events = Vec::new();
 
         for node in &mut self.nodes {
             node.update(time);
 
-            while let Some(a) = node.pop_action() {
-                actions.push((node.id, a));
+            while let Some(action) = node.pop_action() {
+                actions.push((node.id, action));
+            }
+
+            while let Some(event) = node.pop_event() {
+                events.push((node.id, event));
             }
         }
 
@@ -77,6 +86,12 @@ impl Simulation {
 
         for (from, action) in actions {
             sim_events.push(self.handle_action(from, action));
+        }
+
+        for (from, event) in events {
+            if let Some(sim_event) = self.handle_event(from, event) {
+                sim_events.push(sim_event);
+            }
         }
 
         serde_json::to_string(&sim_events).unwrap()
@@ -115,6 +130,20 @@ impl Simulation {
                     to_y,
                 }
             }
+        }
+    }
+
+    fn handle_event(&mut self, from: NodeId, event: NodeEvent) -> Option<SimEvent> {
+        match event {
+            NodeEvent::PeerDiscovered(dev) => {
+                let peer = dev.id().value() as u32;
+
+                Some(SimEvent::PeerDiscovered {
+                    node: from.0 as u32,
+                    peer,
+                })
+            }
+            _ => None,
         }
     }
 
@@ -168,10 +197,14 @@ mod tests {
         sim.spawn_node(0, 0, 100);
 
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
-        sim.tick(10);
+        let events = sim.tick(10);
 
         // Ensure welcome packet was sent back to node 0
         assert_eq!(sim.nodes[0].peers()[0], sim.nodes[1].id);
+        //
+        // Check that events outputted are correct
+        assert!(events.contains(r#""type":"WelcomePacketSent""#));
+        assert!(events.contains(r#""type":"PeerDiscovered""#));
     }
 
     #[test]

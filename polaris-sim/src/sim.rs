@@ -34,6 +34,11 @@ pub enum SimEvent {
         node: u32,
         peer: u32,
     },
+    DataReceived {
+        node: u32,
+        peer: u32,
+        data: Vec<u8>,
+    },
 }
 
 #[wasm_bindgen]
@@ -93,9 +98,7 @@ impl Simulation {
         }
 
         for (from, event) in events {
-            if let Some(sim_event) = self.handle_event(from, event) {
-                sim_events.push(sim_event);
-            }
+            sim_events.push(self.handle_event(from, event));
         }
 
         serde_json::to_string(&sim_events).unwrap()
@@ -137,40 +140,51 @@ impl Simulation {
         }
     }
 
-    fn handle_event(&mut self, from: NodeId, event: NodeEvent) -> Option<SimEvent> {
+    fn handle_event(&mut self, from: NodeId, event: NodeEvent) -> SimEvent {
         match event {
             NodeEvent::PeerDiscovered(dev) => {
                 let peer = dev.id().value() as u32;
 
-                Some(SimEvent::PeerDiscovered {
+                SimEvent::PeerDiscovered {
                     node: from.0 as u32,
                     peer,
-                })
+                }
             }
             NodeEvent::PeerTimedOut(dev) => {
                 let peer = dev.id().value() as u32;
 
-                Some(SimEvent::PeerTimedOut {
+                SimEvent::PeerTimedOut {
                     node: from.0 as u32,
                     peer,
-                })
+                }
             }
-            NodeEvent::DataReceived { .. } => None,
+            NodeEvent::DataReceived { from: peer_id, .. } => {
+                let peer = peer_id.value() as u32;
+                let data: Vec<u8> = self.nodes[from.0].pop_data().expect("No data in queue");
+
+                SimEvent::DataReceived {
+                    node: from.0 as u32,
+                    peer,
+                    data,
+                }
+            }
         }
     }
 
+    /// Sends a hello packet to initiate a connection
     pub fn send_hello(&mut self, from: u32, to: u32) {
         let hello = self.nodes[from as usize].inner.create_hello();
         self.nodes[to as usize].receive(&hello, NodeId(from as usize));
     }
 
+    /// Sends a data packet containing `buf`
     pub fn send_data(&mut self, buf: &[u8], from: u32, to: u32) {
-        let mut packet = Vec::new();
         let len = DATA_HEADER_LEN + buf.len();
+        let mut packet = vec![0u8; len];
 
         self.nodes[from as usize]
             .inner
-            .create_data(buf, &mut packet[..len])
+            .create_data(buf, &mut packet)
             .unwrap();
 
         self.nodes[to as usize].receive(&packet, NodeId(from as usize));
@@ -250,5 +264,25 @@ mod tests {
         // Timeout occurs before heartbeat can be sent
         sim.tick(400);
         assert_eq!(sim.nodes[0].peers(), Vec::new());
+    }
+
+    #[test]
+    fn test_data_transfer() {
+        let mut sim = Simulation::new();
+        sim.spawn_node(0, 0, 100);
+        sim.spawn_node(0, 0, 100);
+
+        // Connect nodes
+        sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
+        sim.tick(10);
+
+        sim.send_data(
+            b"Roblox",
+            sim.nodes[0].id.0 as u32,
+            sim.nodes[1].id.0 as u32,
+        );
+
+        let events = sim.tick(10);
+        assert!(events.contains(r#""type":"DataReceived""#));
     }
 }

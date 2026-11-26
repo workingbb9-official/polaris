@@ -225,12 +225,23 @@ mod tests {
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
         let events = sim.tick(10);
 
-        // Ensure welcome packet was sent back to node 0
         assert_eq!(sim.nodes[0].peers()[0], sim.nodes[1].id);
-        //
-        // Check that events outputted are correct
-        assert!(events.contains(r#""type":"WelcomePacketSent""#));
-        assert!(events.contains(r#""type":"PeerDiscovered""#));
+
+        let json: Vec<serde_json::Value> = serde_json::from_str(&events).unwrap();
+
+        assert!(json.contains(&serde_json::json!({
+            "type": "WelcomePacketSent",
+            "from_x": 0,
+            "from_y": 0,
+            "to_x": 0,
+            "to_y": 0,
+        })));
+
+        assert!(json.contains(&serde_json::json!({
+            "type": "PeerDiscovered",
+            "node": 1,
+            "peer": 0,
+        })));
     }
 
     #[test]
@@ -255,7 +266,7 @@ mod tests {
         let mut sim = Simulation::new();
         sim.spawn_node(0, 0, 100);
 
-        assert_eq!(sim.nodes[0].peers(), Vec::new());
+        assert_eq!(sim.nodes[0].peers().len(), 0);
 
         sim.spawn_node(0, 0, 100);
         sim.send_hello(sim.nodes[1].id.0 as u32, sim.nodes[0].id.0 as u32);
@@ -263,7 +274,7 @@ mod tests {
 
         // Timeout occurs before heartbeat can be sent
         sim.tick(400);
-        assert_eq!(sim.nodes[0].peers(), Vec::new());
+        assert_eq!(sim.nodes[0].peers().len(), 0);
     }
 
     #[test]
@@ -275,6 +286,7 @@ mod tests {
         // Connect nodes
         sim.send_hello(sim.nodes[0].id.0 as u32, sim.nodes[1].id.0 as u32);
         sim.tick(10);
+        sim.tick(10);
 
         sim.send_data(
             b"Roblox",
@@ -283,6 +295,13 @@ mod tests {
         );
 
         let events = sim.tick(10);
-        assert!(events.contains(r#""type":"DataReceived""#));
+        let json: Vec<serde_json::Value> = serde_json::from_str(&events).unwrap();
+
+        assert!(json.contains(&serde_json::json!({
+            "type": "DataReceived",
+            "node": 1,
+            "peer": 0,
+            "data": b"Roblox",
+        })));
     }
 }

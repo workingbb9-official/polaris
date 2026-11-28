@@ -14,31 +14,11 @@ pub struct Simulation {
 #[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum SimEvent {
-    WelcomePacketSent {
-        from_x: u32,
-        from_y: u32,
-        to_x: u32,
-        to_y: u32,
-    },
-    HeartbeatPacketSent {
-        from_x: u32,
-        from_y: u32,
-        to_x: u32,
-        to_y: u32,
-    },
-    PeerDiscovered {
-        node: u32,
-        peer: u32,
-    },
-    PeerTimedOut {
-        node: u32,
-        peer: u32,
-    },
-    DataReceived {
-        node: u32,
-        peer: u32,
-        data: Vec<u8>,
-    },
+    WelcomePacketSent { sender: u32, receiver: u32 },
+    HeartbeatPacketSent { sender: u32, receiver: u32 },
+    PeerDiscovered { node: u32, peer: u32 },
+    PeerTimedOut { node: u32, peer: u32 },
+    DataReceived { node: u32, peer: u32, data: Vec<u8> },
 }
 
 #[wasm_bindgen]
@@ -107,34 +87,24 @@ impl Simulation {
     fn handle_action(&mut self, from: NodeId, action: NodeAction) -> SimEvent {
         match action {
             NodeAction::SendWelcome { dev, msg } => {
-                let to = dev.id().value();
-                self.nodes[to as usize].receive(&msg, from);
-
-                let (from_x, from_y) = self.nodes[from.0].position();
-                let (to_x, to_y) = self.nodes[to as usize].position();
+                let receiver = dev.id().value();
+                self.nodes[receiver as usize].receive(&msg, from);
 
                 SimEvent::WelcomePacketSent {
-                    from_x,
-                    from_y,
-                    to_x,
-                    to_y,
+                    sender: from.0 as u32,
+                    receiver: receiver as u32,
                 }
             }
             NodeAction::SendHeartbeat { dev, msg } => {
-                let to = dev.id().value();
-                self.nodes[to as usize].receive(&msg, from);
-
-                let (from_x, from_y) = self.nodes[from.0].position();
-                let (to_x, to_y) = self.nodes[to as usize].position();
+                let receiver = dev.id().value();
+                self.nodes[receiver as usize].receive(&msg, from);
 
                 let uptime = self.nodes[from.0].uptime;
                 self.nodes[from.0].inner.msg_sent(dev.id(), uptime).unwrap();
 
                 SimEvent::HeartbeatPacketSent {
-                    from_x,
-                    from_y,
-                    to_x,
-                    to_y,
+                    sender: from.0 as u32,
+                    receiver: receiver as u32,
                 }
             }
         }
@@ -231,10 +201,8 @@ mod tests {
 
         assert!(json.contains(&serde_json::json!({
             "type": "WelcomePacketSent",
-            "from_x": 0,
-            "from_y": 0,
-            "to_x": 0,
-            "to_y": 0,
+            "sender": 1,
+            "receiver": 0,
         })));
 
         assert!(json.contains(&serde_json::json!({

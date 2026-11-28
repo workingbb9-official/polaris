@@ -203,25 +203,18 @@ function handleSimEvents(events) {
     for (const event of events) {
         switch (event.type) {
             case "WelcomePacketSent":
-                nodeRenderer.sendPacket(
-                    event.from_x,
-                    event.from_y,
-                    event.to_x,
-                    event.to_y,
-                    () => nodeRenderer.drawLineBetween(
-                        event.from_x,
-                        event.from_y,
-                        event.to_x,
-                        event.to_y,
-                    ),
+                nodeRenderer.sendPacketBetweenNodes(
+                    event.sender,
+                    event.receiver,
+                    (x1, y1, x2, y2) => {
+                        nodeRenderer.drawLineBetween(x1, y1, x2, y2);
+                    }
                 );
                 break;
             case "HeartbeatPacketSent":
-                nodeRenderer.sendPacket(
-                    event.from_x,
-                    event.from_y,
-                    event.to_x,
-                    event.to_y,
+                nodeRenderer.sendPacketBetweenNodes(
+                    event.sender,
+                    event.receiver,
                 );
                 break;
             default:

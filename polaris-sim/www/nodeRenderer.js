@@ -165,7 +165,7 @@ export const nodeRenderer = {
 
         this.sendPacket(start.x, start.y, end.x, end.y, () => {
             if (onArrive) {
-                onArrive();
+                onArrive(start.x, start.y, end.x, end.y);
             }
         });
     },

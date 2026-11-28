@@ -149,6 +149,27 @@ export const nodeRenderer = {
         }
     },
 
+    getNodeCenter(nodeId) {
+        const node = document.querySelector(`.node[data-id="${nodeId}"]`);
+        if (!node) return { x: 0, y: 0 };
+
+        return {
+            x: parseFloat(node.style.left),
+            y: parseFloat(node.style.top),
+        };
+    },
+
+    sendPacketBetweenNodes(senderId, receiverId, onArrive) {
+        const start = this.getNodeCenter(senderId);
+        const end = this.getNodeCenter(receiverId);
+
+        this.sendPacket(start.x, start.y, end.x, end.y, () => {
+            if (onArrive) {
+                onArrive();
+            }
+        });
+    },
+
     sendPacket(x1, y1, x2, y2, onArrive) {
         const packet = packetImg.cloneNode();
 
